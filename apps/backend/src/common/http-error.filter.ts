@@ -2,6 +2,7 @@ import { Catch, HttpException, HttpStatus, type ArgumentsHost, type ExceptionFil
 import { ThrottlerException } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
+import { QueryFailedError } from 'typeorm';
 import type { AuthUser } from '../auth/auth-user.js';
 import { actorFields } from '../observability/logger.config.js';
 import { currentRequestId } from './request-context.js';
@@ -24,6 +25,21 @@ const DEFAULT_MESSAGES: Record<number, string> = {
   429: 'Muitas tentativas. Aguarde um minuto e tente novamente.',
 };
 
+/**
+ * LGPD: o QueryFailedError do TypeORM carrega `query`, `parameters` e `driverError`
+ * (com `detail`), ou seja, os valores gravados — corpo do laudo, título, dados do
+ * paciente. O serializer de erro do Pino copiaria tudo para o log, e o REDACT_PATHS
+ * não alcança `err.parameters[n]`. Nem a `message` é segura: o Postgres às vezes
+ * inclui o valor recebido nela (ex.: `invalid input syntax for type uuid: "…"`).
+ * Para esse erro, só vão para o log o SQLSTATE e a constraint. O `name` fica de fora:
+ * o REDACT_PATHS tem '*.name' (nome de pessoa), que o apagaria de qualquer forma.
+ */
+export function loggableError(exception: unknown): unknown {
+  if (!(exception instanceof QueryFailedError)) return exception;
+  const driver = exception.driverError as { code?: string; constraint?: string } | undefined;
+  return { code: driver?.code, constraint: driver?.constraint };
+}
+
 /** Corpo de erro único: { statusCode, code, message, details? } — inclusive para 401/429 dos guards. */
 @Catch()
 export class HttpErrorFilter implements ExceptionFilter {
@@ -37,7 +53,7 @@ export class HttpErrorFilter implements ExceptionFilter {
     const req = ctx.getRequest<Request & { user?: AuthUser; route?: { path?: string } }>();
 
     if (!(exception instanceof HttpException)) {
-      this.logger.error({ err: exception, requestId: currentRequestId() }, 'unhandled error');
+      this.logger.error({ err: loggableError(exception), requestId: currentRequestId() }, 'unhandled error');
       res.status(500).json({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'Erro interno.' });
       return;
     }
