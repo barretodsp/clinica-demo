@@ -1,0 +1,46 @@
+# Portal do paciente
+
+## Objetivo e escopo
+O paciente consulta os próprios agendamentos (tipo, data, situação), identifica quais têm laudo **publicado** e lê seus laudos; nunca acessa dados de outro paciente nem rascunhos (enunciado §4.3).
+
+## Regras
+
+| ID | Regra | Enunciado |
+|---|---|---|
+| PP-01 | Tudo é filtrado pelo `patientId` **da sessão**, nunca por parâmetro | §4.3 |
+| PP-02 | Lista traz exame, data/hora (no fuso da clínica), clínica, situação e `hasPublishedMedicalReport` | §4.3 |
+| PP-03 | Rascunhos não aparecem: nem título, nem texto, nem id (`medicalReportId` só se publicado) | §4.3 |
+| PP-04 | Laudo de outro paciente → 403 `REPORT_ACCESS_DENIED` | §4.3 / teste 2 |
+| PP-05 | Laudo próprio em rascunho → 403 `REPORT_NOT_PUBLISHED`, sem conteúdo | teste 3 |
+| PP-06 | Paciente é global: vê agendamentos de todas as clínicas | decisão |
+| PP-07 | Leitura de laudo gera auditoria `medical_report.viewed` | decisão |
+
+## Sequência — laudo de outro paciente
+
+```mermaid
+sequenceDiagram
+  participant P as Paciente A
+  participant API
+  participant DB as Postgres
+  P->>API: GET /api/me/medical-reports/{laudo de B}
+  API->>DB: carrega laudo + agendamento
+  API->>API: appointment.patient_id ≠ sessão.patientId
+  API-->>P: 403 REPORT_ACCESS_DENIED (sem conteúdo · log access.denied)
+```
+
+## Contrato da API
+- `GET /api/me/appointments` → `[{ id, startsAt, status, examType, clinic{ name, timezone, timezoneLabel }, hasPublishedMedicalReport, medicalReportId, publishedAt }]`
+- `GET /api/me/medical-reports/:id` → laudo publicado: título, corpo, assinatura (nome + CRM), `publishedAt`, clínica e horário do exame.
+
+## Frontend
+`/patient/appointments` (cartões com o selo "Laudo disponível" e o horário no fuso da clínica) e `/patient/medical-reports/$medicalReportId` (leitura com o mesmo componente do editor em modo somente leitura e a assinatura no rodapé). A lista recarrega ao voltar para a aba, para mostrar um laudo recém-publicado.
+
+## Rastreabilidade
+
+| Regra | Teste |
+|---|---|
+| PP-04 | `medical-reports.e2e-spec.ts` › [obrigatório 2] |
+| PP-03, PP-05 | `medical-reports.e2e-spec.ts` › [obrigatório 3] |
+| PP-02 | `medical-reports.e2e-spec.ts` › [obrigatório 4] |
+| PP-06 | `medical-reports.e2e-spec.ts` › paciente vê agendamentos de todas as suas clínicas |
+| PP-01 | `fhir.e2e-spec.ts` / `scheduling.e2e-spec.ts` (equipe e serviço não usam o portal) |
