@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+
+# @scarf/scarf é telemetria (dependência do swagger-ui): não executa scripts de instalação
+allowBuilds:
+  "@scarf/scarf": false

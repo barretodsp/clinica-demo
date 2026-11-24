@@ -1,0 +1,48 @@
+# --- Dependências -----------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# --- Build e arquivos gerados -------------------------------------------------
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+.tanstack/
+
+# --- Testes -------------------------------------------------------------------
+coverage/
+test-results/
+playwright-report/
+
+# --- Ambiente: segredos locais (o .env.example é versionado) -------------------
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Logs ---------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Python (scripts em docker/) ------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- Editores e sistema operacional ---------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Claude Code: configurações locais ------------------------------------------
+.claude/settings.local.json

@@ -1,0 +1,19 @@
+{
+  "name": "clinica-exames",
+  "private": true,
+  "description": "Agendamento de exames e acesso a laudos \u2014 desafio t\u00e9cnico",
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@12.23.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "build": "pnpm --filter ./apps/* build",
+    "test": "pnpm --filter backend test",
+    "db:migrate": "pnpm --filter backend db:migrate",
+    "db:seed": "pnpm --filter backend db:seed",
+    "service-token:generate": "pnpm --filter backend service-token:generate",
+    "lint": "pnpm --filter ./apps/* lint",
+    "db:reset": "pnpm --filter backend db:reset"
+  }
+}
