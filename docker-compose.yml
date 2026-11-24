@@ -1,0 +1,187 @@
+# Ambiente de demonstração: docker compose up -d --build  →  http://clinica.localhost
+# Entradas: nginx (porta 80) e, para inspeção na avaliação, o Postgres em 127.0.0.1:5432.
+# API, Loki, Grafana e o PACS (Orthanc) não publicam portas; o PACS é servido pelo nginx em pacs.clinica.localhost.
+name: clinica
+
+x-db-urls: &db-urls
+  DATABASE_URL: postgres://clinic_app:${CLINIC_APP_PASSWORD}@postgres:5432/clinic
+  DATABASE_MIGRATION_URL: postgres://clinic_owner:${CLINIC_OWNER_PASSWORD}@postgres:5432/clinic
+
+services:
+  postgres:
+    image: postgres:19-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      CLINIC_OWNER_PASSWORD: ${CLINIC_OWNER_PASSWORD:?defina no .env}
+      CLINIC_APP_PASSWORD: ${CLINIC_APP_PASSWORD:?defina no .env}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?defina no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clinic"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    networks:
+      data: {}
+      # a rede "data" é interna (sem rota para fora), o que impede publicar portas
+      dbaccess: {}
+
+  # One-shot: aplica as migrations e o seed com o papel dono do schema, depois termina.
+  migrate:
+    build: { context: ., dockerfile: docker/backend.Dockerfile }
+    image: clinica-backend
+    command: ["sh", "-c", "node dist/database/migrate.js && node dist/database/seed/run-seed.js"]
+    environment:
+      <<: *db-urls
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks:
+      data: {}
+    restart: "no"
+
+  # PACS de demonstração (efêmero: sem volume). Stone Web Viewer em http://pacs.clinica.localhost
+  orthanc:
+    image: orthancteam/orthanc:26.9.1
+    restart: unless-stopped
+    environment:
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      STONE_WEB_VIEWER_PLUGIN_ENABLED: "true"
+      ORTHANC__NAME: Clinica Demo PACS
+      ORTHANC__AUTHENTICATION_ENABLED: "false"   # demonstração: sem requisitos de segurança
+      ORTHANC__DICOM_SERVER_ENABLED: "false"     # sem porta DICOM (4242)
+      ORTHANC__STONE_WEB_VIEWER__SHOW_INFO_PANEL_AT_STARTUP: Never   # valores aceitos: Always | Never | User
+      ORTHANC__STONE_WEB_VIEWER__DATE_FORMAT: DD/MM/YYYY
+      VERBOSITY: default
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8042/system', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      edge: {}
+
+  # One-shot: gera um estudo (o mesmo Raio-X) por agendamento ativo e grava a URL do Stone na tabela.
+  # Roda a cada `docker compose up`; repovoa o Orthanc efêmero com os mesmos UIDs.
+  pacs-seed:
+    image: clinica-backend
+    command: ["node", "dist/pacs/run-pacs-seed.js"]
+    environment:
+      <<: *db-urls
+      PACS_URL: http://orthanc:8042
+      PACS_PUBLIC_URL: http://pacs.clinica.localhost
+      PACS_TEMPLATE: /pacs/raio-x.dcm
+    volumes:
+      - ./docker/pacs/raio-x.dcm:/pacs/raio-x.dcm:ro
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      orthanc: { condition: service_healthy }
+    networks:
+      edge: {}
+      data: {}
+    restart: "no"
+
+  backend:
+    image: clinica-backend
+    restart: unless-stopped
+    environment:
+      <<: *db-urls
+      NODE_ENV: production
+      PORT: 3000
+      AUTH_SECRET: ${AUTH_SECRET:?defina no .env}
+      AUTH_TOKEN_TTL: ${AUTH_TOKEN_TTL:-1h}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:?defina no .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOKI_URL: http://loki:3100
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks:
+      edge: {}
+      data: {}
+
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    image: clinica-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend: { condition: service_healthy }
+    networks:
+      edge: {}
+
+  # Sonda de disponibilidade: consulta /api/health/ready e o Orthanc (/statistics) a cada 15 s e grava UP/DOWN no Loki
+  # (painéis no dashboard "Saúde da API"). Container à parte: registra a queda mesmo com o backend fora.
+  uptime:
+    image: node:26.13.1-alpine
+    restart: unless-stopped
+    command: ["node", "/probe/probe.mjs"]
+    user: node
+    read_only: true
+    environment:
+      PROBE_TARGET: http://backend:3000/api/health/ready
+      PROBE_PACS_TARGET: http://orthanc:8042/statistics
+      PROBE_INTERVAL_MS: 15000
+      LOKI_URL: http://loki:3100
+    volumes:
+      - ./docker/uptime/probe.mjs:/probe/probe.mjs:ro
+    depends_on:
+      - loki
+    networks:
+      edge: {}
+      data: {}
+
+  loki:
+    image: grafana/loki:3.7.10
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./docker/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - lokidata:/loki
+    networks:
+      data: {}
+
+  grafana:
+    image: grafana/grafana:13.2.6
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina no .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://grafana.clinica.localhost
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/operacao.json
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD}
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - loki
+      - postgres
+    networks:
+      edge: {}
+      data: {}
+
+networks:
+  # nginx ↔ backend ↔ grafana ↔ orthanc (e a sonda uptime → backend)
+  edge: {}
+  # banco, Loki e quem precisa deles; sem rota para fora e sem portas publicadas
+  data:
+    internal: true
+  # só o Postgres: permite publicar a porta em 127.0.0.1
+  dbaccess: {}
+
+volumes:
+  pgdata:
+  lokidata:
+  grafanadata:
