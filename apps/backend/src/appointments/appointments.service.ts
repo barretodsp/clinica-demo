@@ -75,6 +75,9 @@ function toStaffDto(row: AppointmentRow, user: SessionUser) {
 
 export type StaffAppointmentDto = ReturnType<typeof toStaffDto>;
 
+/** Tamanho máximo da lista de agendamentos (não há paginação). */
+export const APPOINTMENT_LIST_LIMIT = 50;
+
 const CONSTRAINT_CONFLICTS: Record<string, { code: string; message: string }> = {
   appointment_clinic_slot_active: { code: 'SLOT_TAKEN', message: 'Este horário já está ocupado nesta clínica.' },
   appointment_patient_slot_active: {
@@ -90,8 +93,15 @@ export class AppointmentsService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Agendamentos da clínica (escopo sempre pelo clinic_id), filtrados por dia local e paciente. */
-  async list(clinic: Clinic, user: SessionUser, filter: AppointmentListFilter): Promise<StaffAppointmentDto[]> {
+  /**
+   * Agendamentos da clínica (escopo sempre pelo clinic_id), filtrados por dia local e paciente.
+   * Sem paginação: no máximo APPOINTMENT_LIST_LIMIT itens.
+   * - Com data: o dia em ordem de horário.
+   * - Sem data: a partir do início do dia de hoje (no fuso da clínica) em ordem de horário,
+   *   e só depois os anteriores, do mais recente para o mais antigo. Assim os atendimentos
+   *   de hoje ficam no topo e os novos agendamentos nunca somem atrás do histórico.
+   */
+  async list(clinic: Clinic, user: SessionUser, filter: AppointmentListFilter, now = new Date()): Promise<StaffAppointmentDto[]> {
     const where = ['a.clinic_id = $1'];
     const params: unknown[] = [clinic.id];
     if (filter.date) {
@@ -103,8 +113,16 @@ export class AppointmentsService {
       params.push(filter.patientId);
       where.push(`a.patient_id = $${params.length}`);
     }
+    let orderBy = 'a.starts_at, a.created_at';
+    if (!filter.date) {
+      params.push(localDayRange(localParts(now, clinic.timezone).date, clinic.timezone).start);
+      const today = `$${params.length}::timestamptz`;
+      // false (de hoje em diante) vem antes de true (dias anteriores)
+      orderBy = `a.starts_at < ${today}, CASE WHEN a.starts_at >= ${today} THEN a.starts_at END, a.starts_at DESC, a.created_at`;
+    }
+    params.push(APPOINTMENT_LIST_LIMIT);
     const rows: AppointmentRow[] = await this.ds.query(
-      `${SELECT_APPOINTMENTS} WHERE ${where.join(' AND ')} ORDER BY a.starts_at, a.created_at LIMIT 500`,
+      `${SELECT_APPOINTMENTS} WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT $${params.length}`,
       params,
     );
     return rows.map((r) => toStaffDto(r, user));

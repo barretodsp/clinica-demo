@@ -84,7 +84,7 @@ sequenceDiagram
 
 | Método e rota | Papel | Resposta |
 |---|---|---|
-| `GET /api/clinics/:clinicId/appointments?date=YYYY-MM-DD&patientId=` | staff | lista com paciente (CPF mascarado), exame, status e resumo do laudo (sem conteúdo) |
+| `GET /api/clinics/:clinicId/appointments?date=YYYY-MM-DD&patientId=` | staff | lista com paciente (CPF mascarado), exame, status e resumo do laudo (sem conteúdo); máx. 50, sem data: hoje no topo, depois futuros e por fim os anteriores |
 | `GET /api/clinics/:clinicId/appointments/available-slots?date=` | atendente | `{ businessDay, slots: [{ startsAt, localTime, available, reason }] }` |
 | `POST /api/clinics/:clinicId/appointments` `{ patientId, examTypeId, startsAt }` | atendente | 201 + agendamento |
 | `GET /api/clinics/:clinicId/appointments/:id` | staff | agendamento |
@@ -120,4 +120,4 @@ Lista com filtros na URL (`?date=&patientId=`, validados com Zod), navegação p
 | AG-12 | `scheduling.e2e-spec.ts` › auditoria na mesma transação; agendamento rejeitado não gera evento |
 
 ## Limitações
-Sem remarcação (cancelar e agendar de novo); sem duração por tipo de exame; listagem limitada a 500 itens por consulta (sem paginação).
+Sem remarcação (cancelar e agendar de novo); sem duração por tipo de exame; listagem limitada a 50 itens por consulta (sem paginação); sem filtro de data, começa pelos atendimentos de hoje (no fuso da clínica), segue pelos futuros em ordem de horário e só depois mostra os anteriores, do mais recente ao mais antigo.

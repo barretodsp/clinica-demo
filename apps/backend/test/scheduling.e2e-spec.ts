@@ -1,5 +1,6 @@
 import { createTestApp, futureSlot, loadIds, nextLocalDate, resetAndSeed, sessionCookie, type Ids, type TestContext } from './helpers.js';
-import { localToUtc, weekdayOf } from '../src/common/clinic-time.js';
+import { addDays, localParts, localToUtc, weekdayOf } from '../src/common/clinic-time.js';
+import { APPOINTMENT_LIST_LIMIT } from '../src/appointments/appointments.service.js';
 import { HOLIDAYS } from '../src/database/seed/holidays.data.js';
 
 describe('Agendamentos (integração)', () => {
@@ -120,6 +121,106 @@ describe('Agendamentos (integração)', () => {
     expect(byPatient.body.every((a: { patient: { id: string } }) => a.patient.id === ids.users['jose@mail.com'].patientId)).toBe(true);
   });
 
+  describe('lista sem filtro de data: hoje no topo, limite APPOINTMENT_LIST_LIMIT, sem paginação', () => {
+    const limit = () => APPOINTMENT_LIST_LIMIT;
+    const tz = () => ids.clinics.SP.timezone;
+    const today = () => localParts(new Date(), tz()).date;
+    const local = (date: string, hhmm: string) => {
+      const [h, m] = hhmm.split(':').map(Number);
+      return localToUtc(date, h * 60 + m, tz());
+    };
+
+    /** Insere direto no banco (a API não agenda no passado nem fora do expediente). */
+    async function insert(startsAt: Date, patient = 'jose@mail.com') {
+      await ctx.owner.query(
+        `INSERT INTO appointment (clinic_id, patient_id, exam_type_id, starts_at, created_by_user_id) VALUES ($1, $2, $3, $4, $5)`,
+        [ids.clinics.SP.id, ids.users[patient].patientId, ids.examTypes['Ultrassonografia'], startsAt, ids.users['paula@mail.com'].userId],
+      );
+    }
+
+    const list = async (query = '') =>
+      (await ctx.http.get(`/api/clinics/${ids.clinics.SP.id}/appointments${query}`).set('Cookie', attSP).expect(200)).body as { startsAt: string }[];
+
+    /** Inícios em ms, para comparar ordem. */
+    const times = (items: { startsAt: string }[]) => items.map((a) => new Date(a.startsAt).getTime());
+    const ascending = (xs: number[]) => xs.every((x, i) => i === 0 || xs[i - 1] <= x);
+    const descending = (xs: number[]) => xs.every((x, i) => i === 0 || xs[i - 1] >= x);
+
+    it('começa pelos atendimentos de hoje (mesmo os que já passaram), segue pelos futuros e termina nos anteriores, do mais recente ao mais antigo', async () => {
+      const todayStart = local(today(), '00:00');
+      const todayLate = local(today(), '23:30');
+      const yesterday = local(addDays(today(), -1), '23:30');
+      const twoDaysAgo = local(addDays(today(), -2), '23:30');
+      for (const t of [twoDaysAgo, todayLate, yesterday, todayStart]) await insert(t);
+
+      const items = await list();
+      const [{ total }] = await ctx.owner.query('SELECT count(*)::int AS total FROM appointment WHERE clinic_id = $1', [ids.clinics.SP.id]);
+      expect(total).toBeLessThan(limit());
+      expect(items).toHaveLength(total);
+
+      expect(items[0].startsAt).toBe(todayStart.toISOString());
+      expect(items[1].startsAt).toBe(todayLate.toISOString());
+
+      const ms = times(items);
+      const firstPast = ms.findIndex((t) => t < todayStart.getTime());
+      expect(firstPast).toBeGreaterThan(1);
+      expect(ms.slice(0, firstPast).every((t) => t >= todayStart.getTime())).toBe(true);
+      expect(ascending(ms.slice(0, firstPast))).toBe(true);
+      expect(ms.slice(firstPast).every((t) => t < todayStart.getTime())).toBe(true);
+      expect(descending(ms.slice(firstPast))).toBe(true);
+      expect(items[firstPast].startsAt).toBe(yesterday.toISOString());
+      expect(ms).toContain(twoDaysAgo.getTime());
+    });
+
+    it('devolve no máximo APPOINTMENT_LIST_LIMIT: os novos agendamentos não somem atrás do histórico', async () => {
+      const extra = limit() + 10;
+      // agendamentos antigos além do limite (antes: com ORDER BY ASC, o histórico ocupava o limite)
+      for (let i = 0; i < extra; i++) await insert(new Date(local(addDays(today(), -30), '00:00').getTime() + i * 1_800_000));
+      // futuros distantes além do limite
+      for (let i = 0; i < extra; i++) await insert(new Date(local(addDays(today(), 400), '00:00').getTime() + i * 1_800_000));
+      await insert(local(today(), '00:00'));
+      const booked = futureSlot(tz(), 1, '17:30');
+      await book(attSP, 'SP', body('joao@mail.com', booked)).expect(201);
+
+      const items = await list();
+      expect(items).toHaveLength(limit());
+      expect(items[0].startsAt).toBe(local(today(), '00:00').toISOString());
+      expect(items.map((a) => a.startsAt)).toContain(booked);
+      const ms = times(items);
+      expect(ascending(ms)).toBe(true);
+      expect(ms.every((t) => t >= local(today(), '00:00').getTime())).toBe(true); // nenhum antigo coube
+    });
+
+    it('com filtro de paciente sem data, aplica a mesma ordem', async () => {
+      const patient = ids.users['jose@mail.com'].patientId!;
+      await insert(local(addDays(today(), -1), '23:30'));
+      await insert(local(today(), '00:00'));
+      const items = (await list(`?patientId=${patient}`)) as { startsAt: string; patient: { id: string } }[];
+      expect(items.every((a) => a.patient.id === patient)).toBe(true);
+      expect(items[0].startsAt).toBe(local(today(), '00:00').toISOString());
+      expect(items.at(-1)!.startsAt).not.toBe(items[0].startsAt);
+      const ms = times(items);
+      const firstPast = ms.findIndex((t) => t < local(today(), '00:00').getTime());
+      expect(ascending(ms.slice(0, firstPast))).toBe(true);
+      expect(descending(ms.slice(firstPast))).toBe(true);
+    });
+
+    it('com filtro de data, mantém a ordem de horário do dia e também limita a APPOINTMENT_LIST_LIMIT', async () => {
+      // 48 horários ativos + cancelados no mesmo dia distante, somando mais que o limite
+      const day = addDays(today(), 400);
+      for (let i = 0; i < 48; i++) await insert(local(day, `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`));
+      await ctx.owner.query(
+        `INSERT INTO appointment (clinic_id, patient_id, exam_type_id, starts_at, status, created_by_user_id, cancelled_by_user_id, cancelled_at)
+         SELECT $1, $2, $3, $4, 'CANCELLED', $5, $5, now() FROM generate_series(1, $6::int)`,
+        [ids.clinics.SP.id, ids.users['joao@mail.com'].patientId, ids.examTypes['Ultrassonografia'], local(day, '00:00'), ids.users['paula@mail.com'].userId, Math.max(10, limit() + 10 - 48)],
+      );
+      const items = await list(`?date=${day}`);
+      expect(items).toHaveLength(limit());
+      expect(ascending(times(items))).toBe(true);
+      expect(items[0].startsAt).toBe(local(day, '00:00').toISOString());
+    });
+  });
+
   it('slots disponíveis: 22 no dia útil, ocupados marcados', async () => {
     const slot = futureSlot(ids.clinics.SP.timezone, 8, '09:00');
     await book(attSP, 'SP', body('joao@mail.com', slot)).expect(201);
@@ -161,5 +262,6 @@ describe('Agendamentos (integração)', () => {
       expect(byCpf.body[0].name).toBe('Maria Oliveira');
       expect((await ctx.http.get('/api/patients?search=jo').set('Cookie', attSP).expect(422)).body.code).toBe('SEARCH_TOO_SHORT');
     });
+
   });
 });
