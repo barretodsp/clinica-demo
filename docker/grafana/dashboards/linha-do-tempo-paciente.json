@@ -1,0 +1,107 @@
+{
+  "uid": "clinica-paciente",
+  "title": "Clínica — Linha do tempo do paciente",
+  "description": "",
+  "tags": [
+    "clinica"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-90d",
+    "to": "now+1d"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "patientId",
+        "label": "ID do paciente",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Histórico do paciente (trilha de auditoria — fonte confiável)",
+      "description": "Informe o ID do paciente (patient.id). Agendado, rascunho criado/salvo/descartado, publicado, visualizado, exportado, cancelado.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT e.created_at AS \"Quando\", e.event AS \"Evento\", e.actor_type AS \"Ator\", e.actor_role AS \"Papel\",\n       e.actor_id AS \"ID do ator\", c.name AS \"Clínica\", e.appointment_id AS \"Agendamento\",\n       e.medical_report_id AS \"Laudo\", e.request_id AS \"Request ID\"\nFROM audit_event e LEFT JOIN clinic c ON c.id = e.clinic_id\nWHERE e.patient_id::text = ${patientId:sqlstring} AND $__timeFilter(e.created_at)\nORDER BY e.created_at"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Logs do paciente (Loki — inclui ações da equipe sobre ele)",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "{app=\"clinic-api\"} |= `$patientId` | json | patientId = `$patientId` and event != \"\"",
+          "queryType": "range",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    }
+  ]
+}

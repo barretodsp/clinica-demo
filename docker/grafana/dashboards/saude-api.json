@@ -1,0 +1,886 @@
+{
+  "uid": "clinica-saude-api",
+  "title": "Clínica — Saúde da API",
+  "description": "Disponibilidade da API, do banco e do PACS (sonda externa) e tráfego HTTP (logs no Loki).",
+  "tags": [
+    "clinica"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "API (backend)",
+      "description": "UP se a API respondeu à última sondagem de GET /api/health/ready (últimos 60 s). DOWN: sem resposta (container parado, travado ou timeout de 5 s).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap apiUp [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 1
+                },
+                "-1": {
+                  "text": "DESCONHECIDO",
+                  "color": "text",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Banco de dados (visto pela API)",
+      "description": "UP se a API conseguiu pingar o Postgres (SELECT 1, timeout 2 s). DESCONHECIDO quando a própria API não responde.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap dbUp [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 1
+                },
+                "-1": {
+                  "text": "DESCONHECIDO",
+                  "color": "text",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "PACS (Orthanc)",
+      "description": "UP se o Orthanc respondeu à última sondagem de GET /statistics (últimos 60 s).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"pacs\"} | json | unwrap up [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 1
+                },
+                "-1": {
+                  "text": "DESCONHECIDO",
+                  "color": "text",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Estudos no PACS",
+      "description": "Quantidade de estudos no Orthanc (efêmero). 0 com o PACS no ar = o pacs-seed não rodou desde a última recriação (docker compose up -d ou make pacs).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"pacs\"} | json | unwrap studies [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Disponibilidade da API no período",
+      "description": "Fração das sondagens com API e banco OK (HTTP 200) no período selecionado.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "avg_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap up [$__range]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.95
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Disponibilidade do PACS no período",
+      "description": "Fração das sondagens com o Orthanc respondendo (HTTP 200) no período selecionado.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "avg_over_time({app=\"uptime\", target=\"pacs\"} | json | unwrap up [$__range]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.95
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Tempo de resposta — API",
+      "description": "Latência da última chamada a /api/health/ready (inclui o ping no banco).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap latencyMs [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Tempo de resposta — PACS",
+      "description": "Latência da última chamada a /statistics do Orthanc.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "last_over_time({app=\"uptime\", target=\"pacs\"} | json | unwrap latencyMs [1m]) by (target)",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "SEM DADOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 9,
+      "type": "state-timeline",
+      "title": "Histórico UP/DOWN",
+      "description": "Pior estado em cada intervalo (uma queda curta não some na agregação). Faixa vazia = sem sondagem.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "min_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap apiUp [$__auto]) by (target)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "API"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "B",
+          "expr": "min_over_time({app=\"uptime\", target=\"clinic-api\"} | json | unwrap dbUp [$__auto]) by (target)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "Banco de dados"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "C",
+          "expr": "min_over_time({app=\"uptime\", target=\"pacs\"} | json | unwrap up [$__auto]) by (target)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "PACS (Orthanc)"
+        }
+      ],
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 1
+                },
+                "-1": {
+                  "text": "DESCONHECIDO",
+                  "color": "text",
+                  "index": 2
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "transformations": [],
+      "interval": "30s"
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Respostas por status HTTP",
+      "description": "Inclui 401/403/409/422/429/5xx.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "sum by (statusCode) (count_over_time({app=\"clinic-api\"} | json | event=\"http.request\" [$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{statusCode}}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Erros por rota (4xx/5xx)",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "sum by (route, statusCode) (count_over_time({app=\"clinic-api\"} | json | event=\"http.request\" | statusCode >= 400 [$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{statusCode}} {{route}}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Acessos negados (403) e logins com falha",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "sum by (event) (count_over_time({app=\"clinic-api\"} | json | event=~\"access.denied|auth.login_failed\" [$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Acessos negados e logins com falha — detalhe (usuário, motivo)",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 27,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "sum by (event, actorId, actorRole, code, route, ip) (count_over_time({app=\"clinic-api\"} | json | event=~\"access.denied|auth.login_failed\" [$__range]))",
+          "queryType": "instant",
+          "editorMode": "code"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Latência p95 por rota (ms)",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "quantile_over_time(0.95, {app=\"clinic-api\"} | json | event=\"http.request\" | unwrap responseTimeMs [$__auto]) by (route)",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "transformations": []
+    }
+  ]
+}

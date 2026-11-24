@@ -1,0 +1,22 @@
+apiVersion: 1
+datasources:
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+  # Leitura direta das tabelas com o papel somente leitura grafana_ro (decisão documentada)
+  - name: Clinic DB
+    uid: clinicdb
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: grafana_ro
+    isDefault: true
+    jsonData:
+      database: clinic
+      sslmode: disable
+      postgresVersion: 1500
+    secureJsonData:
+      password: ${GRAFANA_DB_PASSWORD}

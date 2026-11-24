@@ -1,0 +1,150 @@
+{
+  "uid": "clinica-usuario",
+  "title": "Clínica — Atividade por usuário",
+  "description": "",
+  "tags": [
+    "clinica"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-30d",
+    "to": "now+1d"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "userId",
+        "label": "ID do usuário",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Ações do usuário (auditoria)",
+      "description": "Informe o ID do usuário (user.id).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT e.created_at AS \"Quando\", e.event AS \"Evento\", e.actor_role AS \"Papel\", c.name AS \"Clínica\",\n       e.patient_id AS \"Paciente\", e.appointment_id AS \"Agendamento\", e.medical_report_id AS \"Laudo\", e.request_id AS \"Request ID\"\nFROM audit_event e LEFT JOIN clinic c ON c.id = e.clinic_id\nWHERE e.actor_id = ${userId:sqlstring} AND $__timeFilter(e.created_at)\nORDER BY e.created_at DESC"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Volume de ações por evento",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "sum by (event) (count_over_time({app=\"clinic-api\"} |= `$userId` | json | actorId = `$userId` and event != \"\" [$__auto]))",
+          "queryType": "range",
+          "editorMode": "code",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Tudo o que o usuário fez (Loki)",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "expr": "{app=\"clinic-api\"} |= `$userId` | json | actorId = `$userId` | line_format `{{.actorRole}} {{.event}} {{.method}} {{.route}} {{.statusCode}} | clinic={{.clinicId}} patient={{.patientId}} appt={{.appointmentId}} report={{.medicalReportId}} req={{.requestId}}`",
+          "queryType": "range",
+          "editorMode": "code"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    }
+  ]
+}

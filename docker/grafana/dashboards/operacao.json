@@ -1,0 +1,534 @@
+{
+  "uid": "clinica-operacao",
+  "title": "Clínica — Operação",
+  "description": "Indicadores do banco (Postgres). Período e clínica nos filtros do topo.",
+  "tags": [
+    "clinica"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-30d",
+    "to": "now+30d"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "clinic",
+        "label": "Clínica",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "clinicdb"
+        },
+        "query": "SELECT name AS __text, id::text AS __value FROM clinic ORDER BY name",
+        "definition": "SELECT name AS __text, id::text AS __value FROM clinic ORDER BY name",
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Agendamentos criados",
+      "description": "Por data de criação (created_at).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT count(*) AS value FROM appointment a\nWHERE $__timeFilter(a.created_at) AND a.clinic_id::text IN (${clinic:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "teal"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Exames no período",
+      "description": "Exames ativos com data (starts_at) no período.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT count(*) AS value FROM appointment a\nWHERE a.status = 'SCHEDULED' AND $__timeFilter(a.starts_at) AND a.clinic_id::text IN (${clinic:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "teal"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Laudos publicados",
+      "description": "Por data de publicação.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT count(*) AS value FROM medical_report r JOIN appointment a ON a.id = r.appointment_id\nWHERE r.status = 'PUBLISHED' AND $__timeFilter(r.published_at) AND a.clinic_id::text IN (${clinic:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "teal"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Taxa de cancelamento",
+      "description": "Cancelados ÷ total, entre os exames com data no período.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT CASE WHEN count(*) = 0 THEN 0 ELSE 100.0 * count(*) FILTER (WHERE a.status = 'CANCELLED') / count(*) END AS value\nFROM appointment a WHERE $__timeFilter(a.starts_at) AND a.clinic_id::text IN (${clinic:sqlstring})"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "teal"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Agendamentos criados por dia (por clínica)",
+      "description": "Dia no fuso de cada clínica.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT (date_trunc('day', a.created_at AT TIME ZONE c.timezone) AT TIME ZONE c.timezone) AS time,\n       c.name AS metric, count(*) AS value\nFROM appointment a JOIN clinic c ON c.id = a.clinic_id\nWHERE $__timeFilter(a.created_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Cancelamentos por dia (por clínica)",
+      "description": "Por data do cancelamento (cancelled_at).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT (date_trunc('day', a.cancelled_at AT TIME ZONE c.timezone) AT TIME ZONE c.timezone) AS time,\n       c.name AS metric, count(*) AS value\nFROM appointment a JOIN clinic c ON c.id = a.clinic_id\nWHERE a.status = 'CANCELLED' AND $__timeFilter(a.cancelled_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Exames agendados por tipo (empilhado por clínica)",
+      "description": "Por data do exame (starts_at).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT e.name AS tipo, c.name AS clinica, count(*)::int AS total\nFROM appointment a JOIN exam_type e ON e.id = a.exam_type_id JOIN clinic c ON c.id = a.clinic_id\nWHERE a.status = 'SCHEDULED' AND $__timeFilter(a.starts_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY 1, 2 ORDER BY 1, 2"
+        }
+      ],
+      "options": {
+        "stacking": "normal",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "xTickLabelRotation": 0
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "clinica",
+            "rowField": "tipo",
+            "valueField": "total",
+            "emptyValue": "zero"
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Médicos com mais laudos publicados",
+      "description": "Somente laudos publicados, por data de publicação.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT u.name AS medico, count(*) AS laudos\nFROM medical_report r\nJOIN appointment a ON a.id = r.appointment_id\nJOIN doctor d ON d.id = r.doctor_id\nJOIN \"user\" u ON u.id = d.user_id\nWHERE r.status = 'PUBLISHED' AND $__timeFilter(r.published_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY u.name ORDER BY laudos DESC LIMIT 10"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "values": true,
+          "calcs": [],
+          "fields": ""
+        },
+        "showUnfilled": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Ocupação da agenda (agendamentos ativos por dia da semana × horário local)",
+      "description": "Mapa de calor: horários de pico e ociosos (cor = volume).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT to_char(a.starts_at AT TIME ZONE c.timezone, 'HH24:MI') AS \"Horário\",\n  count(*) FILTER (WHERE extract(isodow FROM a.starts_at AT TIME ZONE c.timezone) = 1) AS \"Seg\",\n  count(*) FILTER (WHERE extract(isodow FROM a.starts_at AT TIME ZONE c.timezone) = 2) AS \"Ter\",\n  count(*) FILTER (WHERE extract(isodow FROM a.starts_at AT TIME ZONE c.timezone) = 3) AS \"Qua\",\n  count(*) FILTER (WHERE extract(isodow FROM a.starts_at AT TIME ZONE c.timezone) = 4) AS \"Qui\",\n  count(*) FILTER (WHERE extract(isodow FROM a.starts_at AT TIME ZONE c.timezone) = 5) AS \"Sex\"\nFROM appointment a JOIN clinic c ON c.id = a.clinic_id\nWHERE a.status = 'SCHEDULED' AND $__timeFilter(a.starts_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "gradient"
+            },
+            "align": "center"
+          },
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "transformations": []
+    },
+    {
+      "id": 10,
+      "type": "barchart",
+      "title": "Tempo até a publicação do laudo (horas, média e p90)",
+      "description": "published_at − starts_at, por médico.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "clinicdb"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "clinicdb"
+          },
+          "refId": "A",
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT u.name AS medico,\n  round(avg(extract(epoch FROM r.published_at - a.starts_at) / 3600)::numeric, 1) AS \"Média (h)\",\n  round(percentile_cont(0.9) WITHIN GROUP (ORDER BY extract(epoch FROM r.published_at - a.starts_at) / 3600)::numeric, 1) AS \"P90 (h)\"\nFROM medical_report r\nJOIN appointment a ON a.id = r.appointment_id\nJOIN doctor d ON d.id = r.doctor_id JOIN \"user\" u ON u.id = d.user_id\nWHERE r.status = 'PUBLISHED' AND $__timeFilter(r.published_at) AND a.clinic_id::text IN (${clinic:sqlstring})\nGROUP BY u.name ORDER BY 2 DESC"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "transformations": []
+    }
+  ]
+}
