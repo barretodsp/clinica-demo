@@ -1,0 +1,39 @@
+body {
+  background: var(--mantine-color-gray-0);
+}
+
+/* Conteúdo do laudo: mesma aparência no editor e na leitura */
+.report-content h2 {
+  font-size: 1.15rem;
+  margin: 1rem 0 0.4rem;
+}
+.report-content h3 {
+  font-size: 1rem;
+  margin: 0.8rem 0 0.3rem;
+}
+.report-content p {
+  margin: 0 0 0.5rem;
+  line-height: 1.6;
+}
+.report-content ul,
+.report-content ol {
+  padding-left: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+.report-content .tiptap {
+  outline: none;
+}
+.mantine-RichTextEditor-root .tiptap {
+  min-height: 260px;
+}
+.report-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--mantine-color-gray-5);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.demo-account:hover {
+  background: var(--mantine-color-gray-1);
+}
