@@ -3,8 +3,7 @@ import { Public } from '@nestjs/authentication';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-
-const DB_PING_TIMEOUT_MS = 2_000;
+import { env } from './config/env.js';
 
 /**
  * - GET /api/health        — liveness: o processo responde (healthcheck do Docker). Não toca no banco.
@@ -27,7 +26,7 @@ export class HealthController {
   async ready() {
     const started = performance.now();
     try {
-      await withTimeout(this.dataSource.query('SELECT 1'), DB_PING_TIMEOUT_MS);
+      await withTimeout(this.dataSource.query('SELECT 1'), env().HEALTH_DB_TIMEOUT_MS);
     } catch {
       throw new ServiceUnavailableException({
         code: 'NOT_READY',

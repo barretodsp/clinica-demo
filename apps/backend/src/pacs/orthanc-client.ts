@@ -3,10 +3,12 @@ export class OrthancClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    /** Tempo máximo de cada chamada à API REST (PACS_REQUEST_TIMEOUT_MS). */
+    private readonly requestTimeoutMs = 30_000,
   ) {}
 
   private async call(path: string, init?: RequestInit): Promise<Response> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, { ...init, signal: AbortSignal.timeout(30_000) });
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, { ...init, signal: AbortSignal.timeout(this.requestTimeoutMs) });
     if (!res.ok) throw new Error(`Orthanc ${init?.method ?? 'GET'} ${path}: HTTP ${res.status} ${await res.text()}`);
     return res;
   }

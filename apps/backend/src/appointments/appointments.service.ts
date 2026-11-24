@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { businessSlots, localDayRange, localParts } from '../common/clinic-time.js';
+import { env } from '../config/env.js';
 import { maskCpf } from '../common/cpf.js';
 import { conflict, forbidden, notFound, uniqueViolation, unprocessable } from '../common/errors.js';
 import type { SessionUser } from '../auth/auth-user.js';
@@ -75,9 +76,6 @@ function toStaffDto(row: AppointmentRow, user: SessionUser) {
 
 export type StaffAppointmentDto = ReturnType<typeof toStaffDto>;
 
-/** Tamanho máximo da lista de agendamentos (não há paginação). */
-export const APPOINTMENT_LIST_LIMIT = 50;
-
 const CONSTRAINT_CONFLICTS: Record<string, { code: string; message: string }> = {
   appointment_clinic_slot_active: { code: 'SLOT_TAKEN', message: 'Este horário já está ocupado nesta clínica.' },
   appointment_patient_slot_active: {
@@ -95,7 +93,7 @@ export class AppointmentsService {
 
   /**
    * Agendamentos da clínica (escopo sempre pelo clinic_id), filtrados por dia local e paciente.
-   * Sem paginação: no máximo APPOINTMENT_LIST_LIMIT itens.
+   * Sem paginação: no máximo APPOINTMENT_LIST_LIMIT itens (env, padrão 50).
    * - Com data: o dia em ordem de horário.
    * - Sem data: a partir do início do dia de hoje (no fuso da clínica) em ordem de horário,
    *   e só depois os anteriores, do mais recente para o mais antigo. Assim os atendimentos
@@ -120,7 +118,7 @@ export class AppointmentsService {
       // false (de hoje em diante) vem antes de true (dias anteriores)
       orderBy = `a.starts_at < ${today}, CASE WHEN a.starts_at >= ${today} THEN a.starts_at END, a.starts_at DESC, a.created_at`;
     }
-    params.push(APPOINTMENT_LIST_LIMIT);
+    params.push(env().APPOINTMENT_LIST_LIMIT);
     const rows: AppointmentRow[] = await this.ds.query(
       `${SELECT_APPOINTMENTS} WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT $${params.length}`,
       params,

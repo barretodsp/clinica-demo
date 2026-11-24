@@ -76,6 +76,8 @@ services:
       PACS_URL: http://orthanc:8042
       PACS_PUBLIC_URL: http://pacs.clinica.localhost
       PACS_TEMPLATE: /pacs/raio-x.dcm
+      PACS_REQUEST_TIMEOUT_MS: ${PACS_REQUEST_TIMEOUT_MS:-30000}
+      PACS_READY_TIMEOUT_MS: ${PACS_READY_TIMEOUT_MS:-120000}
     volumes:
       - ./docker/pacs/raio-x.dcm:/pacs/raio-x.dcm:ro
     depends_on:
@@ -99,6 +101,9 @@ services:
       SERVICE_TOKEN_SECRET: ${SERVICE_TOKEN_SECRET:?defina no .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOKI_URL: http://loki:3100
+      APPOINTMENT_LIST_LIMIT: ${APPOINTMENT_LIST_LIMIT:-50}
+      PATIENT_SEARCH_LIMIT: ${PATIENT_SEARCH_LIMIT:-20}
+      HEALTH_DB_TIMEOUT_MS: ${HEALTH_DB_TIMEOUT_MS:-2000}
     depends_on:
       migrate: { condition: service_completed_successfully }
     networks:

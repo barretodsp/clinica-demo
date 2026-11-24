@@ -25,7 +25,7 @@ A atendente seleciona paciente cadastrado, tipo de exame, data e horário; a equ
 | AG-07 | Feriados nacionais bloqueiam → 422 `HOLIDAY` (ver [calendar-holidays.md](calendar-holidays.md)) | decisão |
 | AG-08 | Agendável até 31/12/2028 → 422 `BEYOND_BOOKING_WINDOW` | decisão |
 | AG-09 | Cancelar só `SCHEDULED` **sem nenhum laudo** (rascunho ou publicado) → 409 `APPOINTMENT_HAS_REPORT` | §4.2 + decisão |
-| AG-10 | Busca de paciente por nome (sem acento/caixa) ou CPF exato; mín. 3 caracteres (422 `SEARCH_TOO_SHORT`); máx. 20; CPF mascarado | decisão |
+| AG-10 | Busca de paciente por nome (sem acento/caixa) ou CPF exato; mín. 3 caracteres (422 `SEARCH_TOO_SHORT`); máx. 20 (`PATIENT_SEARCH_LIMIT`); CPF mascarado | decisão |
 | AG-11 | Filtro por data usa o **dia local** da clínica convertido para intervalo UTC | §4.1 |
 | AG-12 | Agendar/cancelar grava auditoria na mesma transação | decisão |
 
@@ -84,7 +84,7 @@ sequenceDiagram
 
 | Método e rota | Papel | Resposta |
 |---|---|---|
-| `GET /api/clinics/:clinicId/appointments?date=YYYY-MM-DD&patientId=` | staff | lista com paciente (CPF mascarado), exame, status e resumo do laudo (sem conteúdo); máx. 50, sem data: hoje no topo, depois futuros e por fim os anteriores |
+| `GET /api/clinics/:clinicId/appointments?date=YYYY-MM-DD&patientId=` | staff | lista com paciente (CPF mascarado), exame, status e resumo do laudo (sem conteúdo); máx. 50 (`APPOINTMENT_LIST_LIMIT`), sem data: hoje no topo, depois futuros e por fim os anteriores |
 | `GET /api/clinics/:clinicId/appointments/available-slots?date=` | atendente | `{ businessDay, slots: [{ startsAt, localTime, available, reason }] }` |
 | `POST /api/clinics/:clinicId/appointments` `{ patientId, examTypeId, startsAt }` | atendente | 201 + agendamento |
 | `GET /api/clinics/:clinicId/appointments/:id` | staff | agendamento |
@@ -120,4 +120,4 @@ Lista com filtros na URL (`?date=&patientId=`, validados com Zod), navegação p
 | AG-12 | `scheduling.e2e-spec.ts` › auditoria na mesma transação; agendamento rejeitado não gera evento |
 
 ## Limitações
-Sem remarcação (cancelar e agendar de novo); sem duração por tipo de exame; listagem limitada a 50 itens por consulta (sem paginação); sem filtro de data, começa pelos atendimentos de hoje (no fuso da clínica), segue pelos futuros em ordem de horário e só depois mostra os anteriores, do mais recente ao mais antigo.
+Sem remarcação (cancelar e agendar de novo); sem duração por tipo de exame; listagem limitada a 50 itens por consulta (sem paginação; ajustável por `APPOINTMENT_LIST_LIMIT`); sem filtro de data, começa pelos atendimentos de hoje (no fuso da clínica), segue pelos futuros em ordem de horário e só depois mostra os anteriores, do mais recente ao mais antigo.

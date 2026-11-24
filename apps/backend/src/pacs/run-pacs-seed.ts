@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { env } from '../config/env.js';
 import { createDataSource } from '../database/data-source.js';
 import { OrthancClient } from './orthanc-client.js';
+import { pacsEnv } from './pacs-env.js';
 import { seedPacsImages } from './pacs-seed.js';
 
 /**
@@ -16,8 +17,9 @@ async function main(): Promise<void> {
   if (!dbUrl) throw new Error('DATABASE_MIGRATION_URL não definida');
 
   const template = new Uint8Array(await readFile(templatePath));
-  const orthanc = new OrthancClient(orthancUrl);
-  await orthanc.waitReady();
+  const timeouts = pacsEnv();
+  const orthanc = new OrthancClient(orthancUrl, fetch, timeouts.PACS_REQUEST_TIMEOUT_MS);
+  await orthanc.waitReady(timeouts.PACS_READY_TIMEOUT_MS);
 
   const ds = await createDataSource(dbUrl).initialize();
   try {

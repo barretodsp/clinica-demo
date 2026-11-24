@@ -25,8 +25,11 @@ function loadDotEnv(): void {
 }
 
 const booleanString = z.enum(['true', 'false']).transform((v) => v === 'true');
+/** Inteiro vindo do ambiente, com default quando a variável não está definida (ou está vazia). */
+const intInRange = (min: number, max: number, fallback: number) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(min).max(max).default(fallback));
 
-const envSchema = z.object({
+export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1),
@@ -47,6 +50,12 @@ const envSchema = z.object({
   SERVICE_RATE_LIMIT: z.coerce.number().int().positive().default(60),
   FHIR_CPF_SYSTEM: z.string().default('https://saude.gov.br/fhir/sid/cpf'),
   FHIR_CRM_SYSTEM: z.string().default('https://clinica.localhost/fhir/sid/crm'),
+  /** Itens por consulta na lista de agendamentos (não há paginação). */
+  APPOINTMENT_LIST_LIMIT: intInRange(1, 500, 50),
+  /** Resultados por busca de paciente (a busca nunca lista todos). */
+  PATIENT_SEARCH_LIMIT: intInRange(1, 100, 20),
+  /** Tempo máximo do ping no banco em /api/health/ready (abaixo do timeout da sonda, 5 s). */
+  HEALTH_DB_TIMEOUT_MS: intInRange(100, 10_000, 2_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

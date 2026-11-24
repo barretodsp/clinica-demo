@@ -1,6 +1,6 @@
 import { createTestApp, futureSlot, loadIds, nextLocalDate, resetAndSeed, sessionCookie, type Ids, type TestContext } from './helpers.js';
 import { addDays, localParts, localToUtc, weekdayOf } from '../src/common/clinic-time.js';
-import { APPOINTMENT_LIST_LIMIT } from '../src/appointments/appointments.service.js';
+import { env, resetEnvCache } from '../src/config/env.js';
 import { HOLIDAYS } from '../src/database/seed/holidays.data.js';
 
 describe('Agendamentos (integração)', () => {
@@ -121,8 +121,24 @@ describe('Agendamentos (integração)', () => {
     expect(byPatient.body.every((a: { patient: { id: string } }) => a.patient.id === ids.users['jose@mail.com'].patientId)).toBe(true);
   });
 
+  /** Roda `fn` com variáveis de ambiente trocadas (o env() é relido) e restaura depois. */
+  async function withEnv(vars: Record<string, string>, fn: () => Promise<void>) {
+    const previous = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, vars);
+    resetEnvCache();
+    try {
+      await fn();
+    } finally {
+      for (const [k, v] of Object.entries(previous)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      resetEnvCache();
+    }
+  }
+
   describe('lista sem filtro de data: hoje no topo, limite APPOINTMENT_LIST_LIMIT, sem paginação', () => {
-    const limit = () => APPOINTMENT_LIST_LIMIT;
+    const limit = () => env().APPOINTMENT_LIST_LIMIT;
     const tz = () => ids.clinics.SP.timezone;
     const today = () => localParts(new Date(), tz()).date;
     const local = (date: string, hhmm: string) => {
@@ -219,6 +235,19 @@ describe('Agendamentos (integração)', () => {
       expect(ascending(times(items))).toBe(true);
       expect(items[0].startsAt).toBe(local(day, '00:00').toISOString());
     });
+
+    it('o limite vem do ambiente (APPOINTMENT_LIST_LIMIT)', async () => {
+      await withEnv({ APPOINTMENT_LIST_LIMIT: '3' }, async () => {
+        await insert(local(today(), '00:00'));
+        const items = await list();
+        expect(items).toHaveLength(3);
+        expect(items[0].startsAt).toBe(local(today(), '00:00').toISOString());
+      });
+      // restaurado o ambiente, volta ao limite padrão
+      const [{ total }] = await ctx.owner.query('SELECT count(*)::int AS total FROM appointment WHERE clinic_id = $1', [ids.clinics.SP.id]);
+      expect(total).toBeGreaterThan(3);
+      expect(await list()).toHaveLength(Math.min(limit(), total));
+    });
   });
 
   it('slots disponíveis: 22 no dia útil, ocupados marcados', async () => {
@@ -263,5 +292,13 @@ describe('Agendamentos (integração)', () => {
       expect((await ctx.http.get('/api/patients?search=jo').set('Cookie', attSP).expect(422)).body.code).toBe('SEARCH_TOO_SHORT');
     });
 
+    it('o número máximo de resultados vem do ambiente (PATIENT_SEARCH_LIMIT)', async () => {
+      // "ira" casa com João Pereira e Maria Oliveira
+      expect((await ctx.http.get('/api/patients?search=ira').set('Cookie', attSP).expect(200)).body).toHaveLength(2);
+      await withEnv({ PATIENT_SEARCH_LIMIT: '1' }, async () => {
+        const res = await ctx.http.get('/api/patients?search=ira').set('Cookie', attSP).expect(200);
+        expect(res.body.map((p: { name: string }) => p.name)).toEqual(['João Pereira']);
+      });
+    });
   });
 });
