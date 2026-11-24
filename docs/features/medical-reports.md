@@ -25,7 +25,7 @@ O médico abre um agendamento, cria o laudo (título, texto e profissional respo
 | LA-07 | Com laudo (rascunho ou publicado) não pode ser cancelado (409 `APPOINTMENT_HAS_REPORT`) | §4.2 + decisão |
 | LA-08 | Registra `published_at` | §4.2 |
 | LA-09 | Título = tipo do exame (fixo, montado no backend) + complemento opcional | decisão |
-| LA-10 | Texto em JSON do Tiptap validado por lista fechada (negrito, itálico, sublinhado, H2/H3, listas, alinhamento, quebra de linha); qualquer outro nó/marca/atributo → 422 `INVALID_REPORT_BODY`; máx. 100 KB | decisão |
+| LA-10 | Texto em JSON do Tiptap validado por lista fechada (negrito, itálico, sublinhado, H2/H3, listas, alinhamento, quebra de linha); qualquer outro nó/marca/atributo → 422 `INVALID_REPORT_BODY`; máx. 100 KB, medidos como o banco mede no CHECK (`octet_length(body::text)` do jsonb), então acima disso → 422, nunca 500 | decisão |
 | LA-11 | Não publica laudo vazio → 422 `EMPTY_REPORT_BODY` | decisão |
 | LA-12 | Publicar exige CRM do médico **na UF da clínica** → senão 422 `NO_REGISTRATION_IN_STATE`; grava `registration_id`, `professional_name` e `professional_registration` (assinatura imutável) | §4.2 (profissional responsável) + decisão |
 | LA-13 | Publicação atômica: `UPDATE ... WHERE status = 'DRAFT' AND doctor_id = dono` | decisão |
@@ -122,7 +122,7 @@ Editor Tiptap (`@mantine/tiptap`) com a mesma lista fechada; título com o tipo 
 | LA-03, LA-04, LA-14 | `medical-reports.e2e-spec.ts` › o dono é o único que edita, publica, descarta e vê o conteúdo |
 | LA-05, LA-06, LA-07 | `medical-reports.e2e-spec.ts` › publicado não pode ser editado; com laudo não cancela; cancelado não recebe laudo |
 | LA-09 | `medical-reports.e2e-spec.ts` › título sempre contém o tipo do exame; `report-body.spec.ts` |
-| LA-10, LA-11 | `report-body.spec.ts` (lista fechada, JSON real do editor) e `medical-reports.e2e-spec.ts` › valida o corpo e não publica vazio |
+| LA-10, LA-11 | `report-body.spec.ts` (lista fechada, JSON real do editor), `report-size.spec.ts` (limite de 100 KB no formato do banco, caractere nulo) e `medical-reports.e2e-spec.ts` › valida o corpo e não publica vazio; › mede o tamanho do corpo como o CHECK do banco; › jsonbTextBytes bate com o Postgres; › caractere nulo → 422 |
 | LA-12 | `medical-reports.e2e-spec.ts` › publicação exige CRM na UF da clínica e grava o registro correto |
 | LA-08 | `medical-reports.e2e-spec.ts` › [obrigatório 4] (`publishedAt`) |
 | LA-15 | `fhir.e2e-spec.ts` / `scheduling.e2e-spec.ts` (auditoria); `misc.spec.ts` (redação) |

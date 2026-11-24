@@ -9,6 +9,7 @@ import {
   emptyReportDocument,
   extractPlainText,
   isEffectivelyEmpty,
+  jsonbTextBytes,
   MAX_BODY_BYTES,
   reportDocumentSchema,
   type ReportDocument,
@@ -28,7 +29,7 @@ export function parseReportBody(body: unknown): { doc: ReportDocument; text: str
       issues: parsed.error.issues.slice(0, 5).map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
   }
-  if (Buffer.byteLength(JSON.stringify(parsed.data)) > MAX_BODY_BYTES) {
+  if (jsonbTextBytes(parsed.data) > MAX_BODY_BYTES) {
     throw unprocessable('INVALID_REPORT_BODY', 'O texto do laudo excede o tamanho máximo (100 KB).');
   }
   return { doc: parsed.data, text: extractPlainText(parsed.data) };

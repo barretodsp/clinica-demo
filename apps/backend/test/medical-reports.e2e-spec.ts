@@ -1,3 +1,4 @@
+import { jsonbTextBytes } from '../src/medical-reports/report-body.js';
 import { createTestApp, futureSlot, loadIds, resetAndSeed, sessionCookie, type Ids, type TestContext } from './helpers.js';
 
 const BODY = {
@@ -150,6 +151,43 @@ describe('Laudos e acesso do paciente (integração)', () => {
     expect(bad.body.code).toBe('INVALID_REPORT_BODY');
     await save('SP', 'carlos@mail.com', reportId, { body: '<p>html</p>' }).expect(422);
     expect((await publish('SP', 'carlos@mail.com', reportId).expect(422)).body.code).toBe('EMPTY_REPORT_BODY');
+  });
+
+  it('mede o tamanho do corpo como o CHECK do banco (jsonb::text): acima do limite → 422, nunca 500', async () => {
+    const { reportId } = await draft();
+    // muitos nós pequenos: 102026 bytes em JSON compacto (passava no limite antigo), 112028 no texto do jsonb (espaços após ':' e ',')
+    const paragraph = { type: 'paragraph', content: [{ type: 'text', text: 'Sem alterações.', marks: [{ type: 'bold' }] }] };
+    const body = { type: 'doc', content: Array.from({ length: 1_000 }, () => paragraph) };
+    expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThan(102_400);
+    const [{ bytes }] = await ctx.owner.query('SELECT octet_length($1::jsonb::text)::int AS bytes', [JSON.stringify(body)]);
+    expect(bytes).toBeGreaterThan(102_400);
+    expect(jsonbTextBytes(body)).toBe(bytes);
+
+    const res = await save('SP', 'carlos@mail.com', reportId, { body }).expect(422);
+    expect(res.body.code).toBe('INVALID_REPORT_BODY');
+  });
+
+  it('jsonbTextBytes bate byte a byte com octet_length(body::text) do Postgres', async () => {
+    const cases: unknown[] = [
+      BODY,
+      { t: '"\\/\b\f\n\r\t' },
+      { t: '\u0001\u001f\u007f' },
+      { t: 'é😀\u2028\u2029 ç ã' },
+      { a: [], b: {}, c: null, d: true, e: [1, 0, -5, 1000] },
+      { type: 'heading', attrs: { textAlign: null, level: 3 }, content: [{ type: 'text', text: 'Conclusão' }] },
+      { type: 'doc', content: [{ type: 'orderedList', attrs: { start: 7, type: null }, content: [{ type: 'listItem', content: [{ type: 'paragraph' }] }] }] },
+    ];
+    for (const value of cases) {
+      const [{ bytes }] = await ctx.owner.query('SELECT octet_length($1::jsonb::text)::int AS bytes', [JSON.stringify(value)]);
+      expect({ value, bytes: jsonbTextBytes(value) }).toEqual({ value, bytes });
+    }
+  });
+
+  it('caractere nulo no texto do laudo → 422, nunca 500 (o jsonb recusa \\u0000)', async () => {
+    const { reportId } = await draft();
+    const body = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a\u0000b' }] }] };
+    const res = await save('SP', 'carlos@mail.com', reportId, { body }).expect(422);
+    expect(res.body.code).toBe('INVALID_REPORT_BODY');
   });
 
   it('o título sempre contém o tipo do exame, mesmo que o cliente envie outro título', async () => {

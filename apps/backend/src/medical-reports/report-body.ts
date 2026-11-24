@@ -52,8 +52,31 @@ export interface ReportDocument {
   content: BlockNode[];
 }
 
-/** Tamanho máximo do JSON serializado (o banco tem CHECK equivalente). */
+/**
+ * Tamanho máximo do corpo, medido como o banco mede no CHECK
+ * `medical_report_body_size` (`octet_length(body::text)`) — ver `jsonbTextBytes`.
+ */
 export const MAX_BODY_BYTES = 100 * 1024;
+
+/**
+ * Bytes de `body::text` no Postgres. A saída textual do jsonb põe um espaço depois
+ * de cada `:` e `,` (o `JSON.stringify` compacto não), então medir com
+ * `JSON.stringify` aceitaria corpos que o CHECK recusa. Strings, inteiros pequenos,
+ * booleanos e null (tudo o que o schema permite) saem iguais nos dois formatos;
+ * a ordem das chaves muda no jsonb, mas não altera o tamanho.
+ */
+export function jsonbTextBytes(value: unknown): number {
+  const text = (v: unknown): string => {
+    if (v === undefined) return 'null'; // como o JSON.stringify faz dentro de arrays
+    if (Array.isArray(v)) return `[${v.map(text).join(', ')}]`;
+    if (v !== null && typeof v === 'object') {
+      const entries = Object.entries(v).filter(([, val]) => val !== undefined);
+      return `{${entries.map(([k, val]) => `${JSON.stringify(k)}: ${text(val)}`).join(', ')}}`;
+    }
+    return JSON.stringify(v);
+  };
+  return Buffer.byteLength(text(value));
+}
 
 const textAlign = z.enum(['left', 'center', 'right', 'justify']).nullable().optional();
 /** O editor pode serializar `attrs: {}` vazio; qualquer atributo é recusado. */
@@ -62,7 +85,8 @@ const mark = z.strictObject({ type: z.enum(['bold', 'italic', 'underline']), att
 
 const textNode = z.strictObject({
   type: z.literal('text'),
-  text: z.string().min(1).max(20_000),
+  // o jsonb do Postgres recusa \u0000 (22P05): sem isto, o save daria 500 em vez de 422
+  text: z.string().min(1).max(20_000).refine((t) => !t.includes('\u0000'), 'Caractere nulo (\\u0000) não é permitido.'),
   marks: z.array(mark).max(3).optional(),
 });
 const hardBreakNode = z.strictObject({ type: z.literal('hardBreak'), attrs: noAttrs });
