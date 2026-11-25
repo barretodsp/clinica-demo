@@ -23,11 +23,18 @@ export interface TestContext {
   close: () => Promise<void>;
 }
 
+/** Variáveis de ajuste operacional que a suíte fixa nos padrões do código. */
+export const PINNED_TO_DEFAULT = ['APPOINTMENT_LIST_LIMIT', 'PATIENT_SEARCH_LIMIT', 'HEALTH_DB_TIMEOUT_MS'] as const;
+
 /** App real (AppModule) contra o banco clinic_test, conectado como clinic_app. */
 export async function createTestApp(): Promise<TestContext> {
   env();
   process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
   process.env.DATABASE_MIGRATION_URL = process.env.DATABASE_MIGRATION_URL_TEST!;
+  // Ajustes operacionais sempre nos padrões do código: o .env local ou o shell de quem roda
+  // não mudam o resultado da suíte (vazio = padrão do schema). Testes que precisam de outro
+  // valor trocam pontualmente com withEnv.
+  for (const name of PINNED_TO_DEFAULT) process.env[name] = '';
   resetEnvCache();
   const { AppModule } = await import('../src/app.module.js');
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })

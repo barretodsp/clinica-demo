@@ -137,6 +137,12 @@ describe('Agendamentos (integração)', () => {
     }
   }
 
+  it('a suíte roda com os padrões do código, independentemente do .env ou do shell', () => {
+    expect(env().APPOINTMENT_LIST_LIMIT).toBe(50);
+    expect(env().PATIENT_SEARCH_LIMIT).toBe(20);
+    expect(env().HEALTH_DB_TIMEOUT_MS).toBe(2_000);
+  });
+
   describe('lista sem filtro de data: hoje no topo, limite APPOINTMENT_LIST_LIMIT, sem paginação', () => {
     const limit = () => env().APPOINTMENT_LIST_LIMIT;
     const tz = () => ids.clinics.SP.timezone;
