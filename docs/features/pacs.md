@@ -25,6 +25,8 @@ Mostrar, de forma simples, a visualização de imagem integrada aos agendamentos
   - botão **Visualizar exame** na tela do agendamento/laudo, para atendentes e médicos;
   - ambos abrem a URL armazenada em nova aba e, sem imagem, mostram "—" ou o botão desabilitado.
 
+**Agendamento cancelado não tem imagem:** o cancelamento limpa `image_viewer_url`, a API devolve `imageViewerUrl: null` para qualquer cancelado (inclusive os cancelados antes dessa limpeza existir) e a tela do agendamento esconde o botão **Visualizar exame**; na lista aparece "—". Sem isso, o link de um cancelado quebraria quando o Orthanc efêmero fosse recriado, porque o `pacs-seed` só gera estudos para agendamentos ativos.
+
 ## Tags trocadas no modelo
 
 | Tag | Valor |
@@ -56,6 +58,7 @@ Mostrar, de forma simples, a visualização de imagem integrada aos agendamentos
 | Um estudo por agendamento ativo, URL gravada, cancelados sem imagem, modelo removido | `pacs.e2e-spec.ts` (Orthanc falso) |
 | Idempotência: reexecução não regera nem altera linhas | `pacs.e2e-spec.ts` |
 | API devolve `imageViewerUrl` | `pacs.e2e-spec.ts` |
+| Cancelado sem imagem: cancelar limpa a URL; a API devolve `null` mesmo para cancelado antigo com URL no banco; o `pacs-seed` não gera estudo para ele | `pacs.e2e-spec.ts` › cancelado não tem imagem |
 | Fluxo no navegador: lista → tela de laudo → Stone exibe o Raio-X com os dados do paciente | verificado com Playwright contra o compose |
 | Disponibilidade no dashboard Saúde da API (PACS UP/DOWN, estudos no PACS, % no período, latência, histórico) | verificado manualmente: `docker compose stop orthanc` → PACS DOWN; volta a UP ao religar |
 | Efêmero: Orthanc recriado vazio → `docker compose up -d` repovoa com as mesmas URLs | verificado manualmente (71 estudos) |

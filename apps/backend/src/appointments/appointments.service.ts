@@ -57,8 +57,13 @@ function toStaffDto(row: AppointmentRow, user: SessionUser) {
     status: row.status,
     cancelledAt: row.cancelled_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
-    /** Stone Web Viewer do PACS de demonstração (aberto direto pelo navegador). */
-    imageViewerUrl: row.image_viewer_url,
+    /**
+     * Stone Web Viewer do PACS de demonstração (aberto direto pelo navegador).
+     * Cancelado não tem imagem: o pacs-seed só gera estudos para agendamentos ativos, então o
+     * link de um cancelado quebraria assim que o Orthanc (efêmero) fosse recriado. O cancelamento
+     * já limpa a coluna; o null aqui cobre linhas canceladas antes dessa limpeza existir.
+     */
+    imageViewerUrl: row.status === 'CANCELLED' ? null : row.image_viewer_url,
     examType: { id: row.exam_type_id, name: row.exam_type_name },
     patient: { id: row.patient_id, name: row.patient_name, documentMasked: maskCpf(row.patient_document) },
     medicalReport: row.report_id
@@ -225,7 +230,9 @@ export class AppointmentsService {
         );
       }
       await m.query(
-        `UPDATE appointment SET status = 'CANCELLED', cancelled_at = now(), cancelled_by_user_id = $2 WHERE id = $1`,
+        // sem imagem depois de cancelado: o pacs-seed não regera estudo para cancelados
+        `UPDATE appointment SET status = 'CANCELLED', cancelled_at = now(), cancelled_by_user_id = $2, image_viewer_url = NULL
+         WHERE id = $1`,
         [id, user.id],
       );
       await record({ event: 'appointment.cancelled', clinicId: clinic.id, patientId: appt.patient_id, appointmentId: id });

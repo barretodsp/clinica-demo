@@ -75,7 +75,7 @@ sequenceDiagram
   alt sim
     API-->>AT: 409 APPOINTMENT_HAS_REPORT
   else não
-    API->>DB: UPDATE status=CANCELLED, cancelled_at, cancelled_by + audit_event · COMMIT
+    API->>DB: UPDATE status=CANCELLED, cancelled_at, cancelled_by, image_viewer_url=NULL + audit_event · COMMIT
     API-->>AT: 200
   end
 ```

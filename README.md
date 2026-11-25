@@ -8,7 +8,7 @@ Aplicação web para uma rede de clínicas: a equipe agenda exames e emite laudo
 | Backend | NestJS 12 · TypeORM 1.1 · PostgreSQL 19 · `@nestjs/authentication` / `@nestjs/authorization` |
 | Frontend | React 19 · Vite 8 · TanStack Router + Query · Mantine 9 (editor de laudo Tiptap) |
 | Infra | Docker Compose · nginx (`clinica.localhost`) · Grafana + Loki · Orthanc (PACS de demonstração) |
-| Testes | Vitest + Supertest contra Postgres real: **184 testes**, unitários e de integração |
+| Testes | Vitest + Supertest contra Postgres real: **187 testes**, unitários e de integração |
 
 **Para avaliar rápido:**
 1. [Suba o ambiente](#2-como-executar). Só precisa de Docker.

@@ -82,4 +82,57 @@ describe('PACS de demonstração (integração)', () => {
     expect(scheduled.length).toBeGreaterThan(0);
     for (const a of scheduled) expect(a.imageViewerUrl).toBe(`${BASE}/stone-webviewer/index.html?study=${uidFromUuid(a.id)}`);
   });
+
+  describe('cancelado não tem imagem', () => {
+    const cookie = () => sessionCookie(ctx.app, ids.users['paula@mail.com'].userId);
+    const viewer = (id: string) => `${BASE}/stone-webviewer/index.html?study=${uidFromUuid(id)}`;
+
+    /** Agendamento ativo de SP com a URL do viewer já gravada (cenário do pacs-seed). */
+    async function scheduledWithImage(): Promise<string> {
+      const [row] = await ctx.owner.query(
+        `SELECT a.id FROM appointment a
+         WHERE a.clinic_id = $1 AND a.status = 'SCHEDULED' AND a.starts_at > now()
+           AND NOT EXISTS (SELECT 1 FROM medical_report r WHERE r.appointment_id = a.id)
+         ORDER BY a.starts_at LIMIT 1`,
+        [ids.clinics.SP.id],
+      );
+      await ctx.owner.query('UPDATE appointment SET image_viewer_url = $2 WHERE id = $1', [row.id, viewer(row.id)]);
+      return row.id;
+    }
+
+    it('cancelar limpa a URL do viewer no banco e na resposta', async () => {
+      const id = await scheduledWithImage();
+      const res = await ctx.http.post(`/api/clinics/${ids.clinics.SP.id}/appointments/${id}/cancel`).set('Cookie', cookie()).expect(200);
+      expect(res.body.status).toBe('CANCELLED');
+      expect(res.body.imageViewerUrl).toBeNull();
+      const [row] = await ctx.owner.query('SELECT image_viewer_url FROM appointment WHERE id = $1', [id]);
+      expect(row.image_viewer_url).toBeNull();
+    });
+
+    it('cancelado antes desta correção (URL ainda no banco): a API devolve imageViewerUrl nulo na lista e no detalhe', async () => {
+      const id = await scheduledWithImage();
+      // simula a linha antiga: cancelada sem limpar a URL
+      await ctx.owner.query(
+        `UPDATE appointment SET status = 'CANCELLED', cancelled_at = now(), cancelled_by_user_id = $2 WHERE id = $1`,
+        [id, ids.users['paula@mail.com'].userId],
+      );
+      const [row] = await ctx.owner.query('SELECT image_viewer_url FROM appointment WHERE id = $1', [id]);
+      expect(row.image_viewer_url).toBe(viewer(id));
+
+      const list = await ctx.http.get(`/api/clinics/${ids.clinics.SP.id}/appointments`).set('Cookie', cookie()).expect(200);
+      expect(list.body.find((a: { id: string }) => a.id === id).imageViewerUrl).toBeNull();
+      const detail = await ctx.http.get(`/api/clinics/${ids.clinics.SP.id}/appointments/${id}`).set('Cookie', cookie()).expect(200);
+      expect(detail.body.imageViewerUrl).toBeNull();
+    });
+
+    it('o pacs-seed não gera estudo para o cancelado', async () => {
+      const id = await scheduledWithImage();
+      await ctx.http.post(`/api/clinics/${ids.clinics.SP.id}/appointments/${id}/cancel`).set('Cookie', cookie()).expect(200);
+      const pacs = fakeOrthanc();
+      await seedPacsImages(ctx.owner, pacs.client, template, BASE);
+      expect(pacs.studies.has(uidFromUuid(id))).toBe(false);
+      const [row] = await ctx.owner.query('SELECT image_viewer_url FROM appointment WHERE id = $1', [id]);
+      expect(row.image_viewer_url).toBeNull();
+    });
+  });
 });

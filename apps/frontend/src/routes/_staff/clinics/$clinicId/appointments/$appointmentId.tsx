@@ -61,7 +61,8 @@ function AppointmentDetail() {
             <Stack align="flex-end" gap={6}>
               <AppointmentStatusBadge status={appt.status} />
               <ReportStatusBadge report={appt.medicalReport} />
-              <ExamImageButton url={appt.imageViewerUrl} />
+              {/* cancelado não tem imagem: sem botão (a API também devolve a URL nula) */}
+              {appt.status === 'SCHEDULED' && <ExamImageButton url={appt.imageViewerUrl} />}
               {me?.role === 'ATTENDANT' && appt.status === 'SCHEDULED' && (
                 <Button
                   color="red"
