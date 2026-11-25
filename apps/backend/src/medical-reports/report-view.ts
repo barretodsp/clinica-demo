@@ -20,6 +20,8 @@ export interface ReportRow {
   doctor_name: string;
   doctor_user_id: string;
   appointment_status: 'SCHEDULED' | 'CANCELLED';
+  /** Stone Web Viewer do PACS de demonstração; exposto só no portal do paciente (ver PP-08). */
+  image_viewer_url: string | null;
   starts_at: Date;
   clinic_id: string;
   clinic_name: string;
@@ -41,7 +43,7 @@ export const SELECT_REPORT = `
          r.published_at, r.registration_id, r.professional_name, r.professional_registration,
          r.created_at, r.updated_at,
          du.name AS doctor_name, du.id AS doctor_user_id,
-         a.status AS appointment_status, a.starts_at,
+         a.status AS appointment_status, a.image_viewer_url, a.starts_at,
          c.id AS clinic_id, c.name AS clinic_name, c.city AS clinic_city, c.state AS clinic_state,
          c.timezone AS clinic_timezone,
          p.id AS patient_id, p.name AS patient_name, to_char(p.birth_date, 'YYYY-MM-DD') AS patient_birth_date,

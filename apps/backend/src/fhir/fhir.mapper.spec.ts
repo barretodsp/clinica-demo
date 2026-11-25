@@ -22,6 +22,7 @@ const row: ReportRow = {
   doctor_name: 'Dr. Bruno Lima',
   doctor_user_id: '01a20bec-2f10-7000-8000-000000000003',
   appointment_status: 'SCHEDULED',
+  image_viewer_url: 'http://pacs.clinica.localhost/stone-webviewer/index.html?study=2.25.1',
   starts_at: new Date('2026-11-19T14:00:00Z'),
   clinic_id: '01a20bec-2f10-7000-8000-000000000004',
   clinic_name: 'Clínica Demo Manaus',
@@ -81,6 +82,10 @@ describe('mapeamento FHIR R4', () => {
     expect(html).toContain('Dr. Bruno Lima');
     expect(html).toContain('CRM/AM 112233');
     expect(html).not.toMatch(/<script|<img|<a /);
+  });
+
+  it('não exporta o link do PACS de demonstração (é só do portal do paciente)', () => {
+    expect(JSON.stringify(bundle)).not.toContain('stone-webviewer');
   });
 
   it('sem LOINC confirmado, o code vai só com o texto', () => {

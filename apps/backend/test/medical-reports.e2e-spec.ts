@@ -86,6 +86,52 @@ describe('Laudos e acesso do paciente (integração)', () => {
     await ctx.http.get(`/api/me/medical-reports/${id}`).set('Cookie', cookies['silvia@mail.com']).expect(200);
   });
 
+  describe('imagens do exame no laudo do paciente (extra de demonstração, PP-08)', () => {
+    const viewer = 'http://pacs.clinica.localhost/stone-webviewer/index.html?study=2.25.123';
+
+    /** Laudo publicado da Silvia, com a URL do viewer gravada no agendamento. */
+    async function publishedWithImage(url: string | null = viewer) {
+      const [row] = await ctx.owner.query(
+        `SELECT r.id, r.appointment_id FROM medical_report r JOIN appointment a ON a.id = r.appointment_id
+         WHERE r.status = 'PUBLISHED' AND a.patient_id = $1 LIMIT 1`,
+        [ids.users['silvia@mail.com'].patientId],
+      );
+      await ctx.owner.query('UPDATE appointment SET image_viewer_url = $2 WHERE id = $1', [row.appointment_id, url]);
+      return row as { id: string; appointment_id: string };
+    }
+
+    it('o paciente dono recebe imageViewerUrl no laudo publicado', async () => {
+      const { id } = await publishedWithImage();
+      const res = await ctx.http.get(`/api/me/medical-reports/${id}`).set('Cookie', cookies['silvia@mail.com']).expect(200);
+      expect(res.body.imageViewerUrl).toBe(viewer);
+    });
+
+    it('sem imagem gerada, imageViewerUrl vem nulo (a tela não mostra o botão)', async () => {
+      const { id } = await publishedWithImage(null);
+      const res = await ctx.http.get(`/api/me/medical-reports/${id}`).set('Cookie', cookies['silvia@mail.com']).expect(200);
+      expect(res.body.imageViewerUrl).toBeNull();
+    });
+
+    it('outro paciente não recebe o link: 403 sem nenhum dado do laudo', async () => {
+      const { id } = await publishedWithImage();
+      const res = await ctx.http.get(`/api/me/medical-reports/${id}`).set('Cookie', cookies['joao@mail.com']).expect(403);
+      expect(JSON.stringify(res.body)).not.toContain('stone-webviewer');
+    });
+
+    it('rascunho do próprio paciente não expõe o link', async () => {
+      const { reportId, appointmentId } = await draft(); // rascunho do Dr. Carlos para o João
+      await ctx.owner.query('UPDATE appointment SET image_viewer_url = $2 WHERE id = $1', [appointmentId, viewer]);
+      const res = await ctx.http.get(`/api/me/medical-reports/${reportId}`).set('Cookie', cookies['joao@mail.com']).expect(403);
+      expect(JSON.stringify(res.body)).not.toContain('stone-webviewer');
+    });
+
+    it('a lista de agendamentos do paciente não traz o link (só a tela do laudo)', async () => {
+      await publishedWithImage();
+      const res = await ctx.http.get('/api/me/appointments').set('Cookie', cookies['silvia@mail.com']).expect(200);
+      expect(JSON.stringify(res.body)).not.toContain('stone-webviewer');
+    });
+  });
+
   it('[obrigatório 3] paciente tentando acessar um rascunho: o conteúdo não é disponibilizado', async () => {
     const { appointmentId, reportId } = await draft();
     await save('SP', 'carlos@mail.com', reportId, { titleComplement: 'Segredo do rascunho', body: BODY }).expect(200);

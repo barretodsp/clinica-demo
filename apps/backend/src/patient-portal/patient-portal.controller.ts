@@ -76,6 +76,14 @@ export class PatientPortalController {
       medicalReportId: row.id,
       doctorId: row.doctor_id,
     });
-    return toReportDto(row);
+    return {
+      ...toReportDto(row),
+      /**
+       * Extra de demonstração (PP-08): link para as imagens no PACS, só no laudo publicado do próprio
+       * paciente (as verificações acima) e nunca para cancelado. O PACS de demonstração é aberto,
+       * então quem chega ao host dele vê todos os estudos: limitação aceita por simplicidade.
+       */
+      imageViewerUrl: row.appointment_status === 'CANCELLED' ? null : row.image_viewer_url,
+    };
   }
 }

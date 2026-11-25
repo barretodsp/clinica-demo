@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { api } from './api';
 import type {
-  Clinic, Me, MedicalReport, PatientAppointment, PatientOption, SlotsResponse, StaffAppointment,
+  Clinic, Me, MedicalReport, PatientAppointment, PatientMedicalReport, PatientOption, SlotsResponse, StaffAppointment,
 } from './types';
 
 export const meQuery = queryOptions({
@@ -82,6 +82,6 @@ export const patientAppointmentsQuery = queryOptions({
 export const patientReportQuery = (id: string) =>
   queryOptions({
     queryKey: ['patient', 'report', id],
-    queryFn: () => api<MedicalReport>(`/me/medical-reports/${id}`),
+    queryFn: () => api<PatientMedicalReport>(`/me/medical-reports/${id}`),
     retry: false,
   });

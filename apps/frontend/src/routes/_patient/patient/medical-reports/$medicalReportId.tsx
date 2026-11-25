@@ -1,5 +1,5 @@
-import { Button, Stack } from '@mantine/core';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { Button, Group, Stack } from '@mantine/core';
+import { IconArrowLeft, IconPhotoScan } from '@tabler/icons-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ErrorState } from '../../../../components/ErrorState';
@@ -17,9 +17,17 @@ function PatientReport() {
   const { data } = useSuspenseQuery(patientReportQuery(medicalReportId));
   return (
     <Stack maw={860} mx="auto">
-      <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} component={Link} to="/patient/appointments">
-        Meus agendamentos
-      </Button>
+      <Group justify="space-between">
+        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} component={Link} to="/patient/appointments">
+          Meus agendamentos
+        </Button>
+        {/* extra de demonstração: abre o Stone Web Viewer do PACS (nova aba) */}
+        {data.imageViewerUrl && (
+          <Button component="a" href={data.imageViewerUrl} target="_blank" rel="noopener noreferrer" variant="light" leftSection={<IconPhotoScan size={16} />}>
+            Visualizar imagens
+          </Button>
+        )}
+      </Group>
       <PublishedReport report={data} />
     </Stack>
   );

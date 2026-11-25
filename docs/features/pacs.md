@@ -1,7 +1,7 @@
 # PACS de demonstração (Orthanc + Stone Web Viewer)
 
 ## Objetivo e escopo
-Mostrar, de forma simples, a visualização de imagem integrada aos agendamentos: cada agendamento ativo tem um estudo num PACS Orthanc, aberto no **Stone Web Viewer** a partir da aplicação.
+Mostrar, de forma simples, a visualização de imagem integrada aos agendamentos: cada agendamento ativo tem um estudo num PACS Orthanc, aberto no **Stone Web Viewer** a partir da aplicação: pela equipe (lista e tela do agendamento) e, como extra, pelo paciente na tela do laudo publicado ([PP-08](patient-portal.md)).
 
 **Fora do escopo (decisão):**
 - **Segurança:** sem autenticação no PACS, sem auditoria do acesso à imagem, sem isolamento por clínica.
@@ -65,6 +65,7 @@ Mostrar, de forma simples, a visualização de imagem integrada aos agendamentos
 
 ## Limitações (assumidas)
 - **PACS aberto:** qualquer pessoa com acesso a `pacs.clinica.localhost` vê e pode alterar todos os estudos, inclusive pelo Orthanc Explorer. Os dados são fictícios e o uso é local.
+- **Imagens para o paciente (extra, adotado por simplicidade):** o botão **Visualizar imagens** no laudo do paciente leva ao mesmo PACS aberto. O backend só entrega o link do próprio exame, mas, chegando ao host do PACS, o paciente consegue ver os estudos de todos os outros pacientes. Fazer isso direito exigiria servir o viewer pelo mesmo host da aplicação, com o nginx consultando o backend (`auth_request`) a cada chamada DICOMweb para conferir a sessão e se o estudo é do paciente.
 - **Mesma imagem para todos os exames:** inclusive ultrassom e ressonância, com `Modality` continuando `CR`.
 - **Agendamentos criados depois da subida:** ficam sem imagem até rodar `make pacs`.
 - **Espera pela subida do Orthanc não é um teto rígido:** o `pacs-seed` confere o prazo `PACS_READY_TIMEOUT_MS` só entre as tentativas, e cada tentativa pode durar até `PACS_REQUEST_TIMEOUT_MS`. Se o Orthanc aceita a conexão mas não responde, a espera real chega a ready + request + 1 s (com os padrões, ~151 s no pior caso em vez de 120 s). Com o Orthanc ainda fora do ar (conexão recusada), as tentativas falham na hora e o prazo é respeitado. Mantenha o request timeout bem menor que o de subida.

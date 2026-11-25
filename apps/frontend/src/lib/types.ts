@@ -89,6 +89,11 @@ export interface MedicalReport {
   isMine?: boolean;
 }
 
+/** Laudo visto pelo paciente: inclui o link para as imagens no PACS de demonstração (quando houver). */
+export interface PatientMedicalReport extends MedicalReport {
+  imageViewerUrl: string | null;
+}
+
 export interface PatientAppointment {
   id: string;
   startsAt: string;

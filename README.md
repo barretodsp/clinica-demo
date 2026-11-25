@@ -8,7 +8,7 @@ Aplicação web para uma rede de clínicas: a equipe agenda exames e emite laudo
 | Backend | NestJS 12 · TypeORM 1.1 · PostgreSQL 19 · `@nestjs/authentication` / `@nestjs/authorization` |
 | Frontend | React 19 · Vite 8 · TanStack Router + Query · Mantine 9 (editor de laudo Tiptap) |
 | Infra | Docker Compose · nginx (`clinica.localhost`) · Grafana + Loki · Orthanc (PACS de demonstração) |
-| Testes | Vitest + Supertest contra Postgres real: **187 testes**, unitários e de integração |
+| Testes | Vitest + Supertest contra Postgres real: **193 testes**, unitários e de integração |
 
 **Para avaliar rápido:**
 1. [Suba o ambiente](#2-como-executar). Só precisa de Docker.
@@ -121,7 +121,7 @@ O enunciado pede uma clínica simplificada. Os itens abaixo não foram pedidos. 
 | **Trilha de auditoria** | Agendar, cancelar, criar, salvar, publicar e ler laudo geram um evento na mesma transação, e a tabela só aceita inclusão. | Rastreabilidade exigida no tratamento de dados de saúde (LGPD). | §4.11 |
 | **Observabilidade** | Logs estruturados no Loki e 4 dashboards no Grafana: operação, saúde, linha do tempo do paciente e atividade por usuário. Os logs levam só IDs, sem dados pessoais. | Para operar e investigar incidentes, sem expor dados sensíveis nos logs. | §4.11 |
 | **Health check e monitor UP/DOWN** | `/api/health` e `/api/health/ready`. Uma sonda externa vigia API, banco e PACS a cada 15 s. | Para saber quando o sistema está fora do ar. | §4.11 |
-| **PACS de demonstração** | Orthanc com Stone Web Viewer. Cada agendamento ganha uma imagem de Raio-X, aberta por "Visualizar exame". | O médico lauda olhando a imagem. Esta é uma demonstração sem segurança. | §4.10 |
+| **PACS de demonstração** | Orthanc com Stone Web Viewer. Cada agendamento ganha uma imagem de Raio-X, aberta por "Visualizar exame". | O médico lauda olhando a imagem. | §4.10 |
 | **Exportação FHIR R4** | O laudo publicado sai como `Bundle` FHIR, para o sistema integrador, com token de serviço. | Padrão de interoperabilidade em saúde, usado pela RNDS. | §4.12 |
 | **Segurança** | Cookie HttpOnly, `SameSite=Strict` e `Secure`; proteção CSRF por origem; limite de 10 tentativas de login por minuto; papéis do banco com privilégio mínimo; IDs não sequenciais (UUID v7). | Proteções mínimas para dados de saúde. | §7 |
 | **Ambiente "de produção" local** | nginx em `clinica.localhost`, Swagger e subida com um comando, com migrations e seed automáticos. | Avaliação sem instalar Node ou Postgres. | §2 |
@@ -298,6 +298,7 @@ Com o seed, dá para ver o mesmo comportamento sem criar nada: o rascunho do **R
 1. Entre: a página é **Meus agendamentos**, com os exames de **todas as clínicas** (SP e Manaus). Cada um mostra o horário no fuso da sua clínica.
 2. Veja as colunas: exame, data e hora, clínica, situação e **Laudo disponível** ou **Laudo ainda não disponível**.
 3. Clique em **Laudo disponível**. Abre o laudo com título, texto, assinatura (nome e CRM) e data de publicação.
+   - **Extra:** se o exame tem imagem no PACS, aparece **Visualizar imagens**, que abre o Stone Web Viewer (veja a limitação no §8).
 4. Depois do §4.5, entre como o paciente daquele agendamento: o laudo publicado pela Dra. Ana aparece para ele, e só para ele (teste obrigatório 4).
 
 ### 4.8 Acesso negado direto na API
@@ -527,6 +528,7 @@ Detalhes e justificativas em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
   - o token de serviço não expira;
   - o Raio-X é exportado sem código LOINC.
 - **PACS:** demonstração sem autenticação, com a mesma imagem para todos os exames.
+- **Imagens no portal do paciente (extra, adotado por simplicidade):** o link leva ao PACS aberto. O backend só entrega o link do próprio exame, mas, chegando ao host do PACS, o paciente consegue ver os estudos dos outros pacientes. A solução de verdade (viewer no mesmo host, com autorização por estudo no nginx) ficou fora do escopo da demonstração.
 - **Sem HTTPS local.** O banco fica exposto em `127.0.0.1:5432` para facilitar a avaliação. Em produção, basta remover `ports` do serviço `postgres`.
 
 ---
