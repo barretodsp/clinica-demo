@@ -8,6 +8,11 @@ import { seedPacsImages } from './pacs-seed.js';
 /**
  * One-shot do docker compose: gera as imagens do PACS de demonstração (Orthanc efêmero)
  * para os agendamentos ativos e grava a URL do Stone Web Viewer em appointment.image_viewer_url.
+ *
+ * Fluxo de demonstração: execute sempre pelo caminho padrão (`docker compose up` ou
+ * `make pacs`), em que o compose passa as variáveis PACS_* ao container. A execução manual
+ * no host não é suportada: o `.env` só é carregado (via env()) quando DATABASE_MIGRATION_URL
+ * não está no ambiente, então as PACS_* do `.env` podem ser ignoradas e valer os padrões.
  */
 async function main(): Promise<void> {
   const dbUrl = process.env.DATABASE_MIGRATION_URL ?? env().DATABASE_MIGRATION_URL;

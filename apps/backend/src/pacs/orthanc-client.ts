@@ -13,7 +13,11 @@ export class OrthancClient {
     return res;
   }
 
-  /** Espera o Orthanc responder (sobe em paralelo com o migrate). */
+  /**
+   * Espera o Orthanc responder (sobe em paralelo com o migrate).
+   * O prazo só é conferido depois que uma tentativa falha; como cada tentativa pode levar até
+   * requestTimeoutMs, a espera máxima real é timeoutMs + requestTimeoutMs + 1 s.
+   */
   async waitReady(timeoutMs = 120_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
