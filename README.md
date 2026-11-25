@@ -574,7 +574,7 @@ apps/backend     NestJS (auth, clinics, patients, catalog, appointments, medical
 apps/frontend    React + Vite (rotas em src/routes, file-based)
 docker/          nginx, Dockerfiles, init do Postgres, Loki, Grafana, consultas do Makefile, sonda uptime, PACS
 Makefile         atalhos: subir, derrubar e consultar o banco (somente leitura)
-docs/            plano, arquitetura, documentação por feature e registro do uso de IA
+docs/            arquitetura, documentação por feature e registro do uso de IA
 ```
 
 | Documento | Conteúdo |
@@ -587,4 +587,4 @@ docs/            plano, arquitetura, documentação por feature e registro do us
 
 ## 12. Tempo dedicado
 
-Aproximadamente **⟨preencher⟩ horas**: refinamento do plano e implementação com IA (veja [docs/AI_LOG.md](docs/AI_LOG.md)).
+Aproximadamente **7 horas**: refinamento do plano e implementação com IA (veja [docs/AI_LOG.md](docs/AI_LOG.md)).

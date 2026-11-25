@@ -17,15 +17,15 @@ Login por e-mail/senha com sessão em cookie HttpOnly, perfis (Atendente, Médic
 
 | ID | Regra | Origem |
 |---|---|---|
-| AU-01 | Login devolve o JWT **somente** em cookie `HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`; nunca no corpo | Plano §8 |
-| AU-02 | JWT HS256 (`AUTH_SECRET` ≥ 32 bytes), claims `sub`, `iat`, `exp`, `iss`, `aud`, `jti`. Expira em 1 h, sem refresh | Plano §8 |
-| AU-03 | O papel **não** está no token: o usuário é carregado do banco a cada requisição; inativo → 401 | Plano §8 |
+| AU-01 | Login devolve o JWT **somente** em cookie `HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`; nunca no corpo | decisão (segurança) |
+| AU-02 | JWT HS256 (`AUTH_SECRET` ≥ 32 bytes), claims `sub`, `iat`, `exp`, `iss`, `aud`, `jti`. Expira em 1 h, sem refresh | decisão (segurança) |
+| AU-03 | O papel **não** está no token: o usuário é carregado do banco a cada requisição; inativo → 401 | decisão (segurança) |
 | AU-04 | E-mail inexistente e senha errada respondem igual (mesmo status, corpo e tempo — hash fictício) | Boa prática |
-| AU-05 | 10 tentativas de login/minuto por IP **e** por conta → 429 `TOO_MANY_ATTEMPTS` | Plano §8 |
+| AU-05 | 10 tentativas de login/minuto por IP **e** por conta → 429 `TOO_MANY_ATTEMPTS` | decisão (segurança) |
 | AU-06 | Deny-by-default: rota sem `@Can()`/`@Public()` é negada | `@nestjs/authorization` |
-| AU-07 | 401 = sem credencial/inválida (front volta ao login com `?redirect=`); 403 = sem permissão (front mostra "acesso negado" e mantém a sessão) | Plano §8 |
-| AU-08 | CSRF: escrita só da mesma origem (`Sec-Fetch-Site`/`Origin` × `Host`) + `SameSite=Strict` | Plano §8 |
-| AU-09 | Token de serviço só é aceito na rota FHIR; em qualquer outra é ignorado (→ 401) | Plano §7.5 |
+| AU-07 | 401 = sem credencial/inválida (front volta ao login com `?redirect=`); 403 = sem permissão (front mostra "acesso negado" e mantém a sessão) | decisão (segurança) |
+| AU-08 | CSRF: escrita só da mesma origem (`Sec-Fetch-Site`/`Origin` × `Host`) + `SameSite=Strict` | decisão (segurança) |
+| AU-09 | Token de serviço só é aceito na rota FHIR; em qualquer outra é ignorado (→ 401) | decisão (integração FHIR) |
 
 ## Sequência — login e chamada autenticada
 
