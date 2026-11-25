@@ -54,8 +54,12 @@ export const envSchema = z.object({
   APPOINTMENT_LIST_LIMIT: intInRange(1, 500, 50),
   /** Resultados por busca de paciente (a busca nunca lista todos). */
   PATIENT_SEARCH_LIMIT: intInRange(1, 100, 20),
-  /** Tempo máximo do ping no banco em /api/health/ready (abaixo do timeout da sonda, 5 s). */
-  HEALTH_DB_TIMEOUT_MS: intInRange(100, 10_000, 2_000),
+  /**
+   * Tempo máximo do ping no banco em /api/health/ready. Precisa ficar abaixo do timeout
+   * da sonda (docker/uptime, 5 s): acima disso a sonda desiste antes do 503 e registra
+   * a API como fora do ar, quando quem caiu foi o banco.
+   */
+  HEALTH_DB_TIMEOUT_MS: intInRange(100, 4_500, 2_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

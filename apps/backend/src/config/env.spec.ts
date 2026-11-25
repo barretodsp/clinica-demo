@@ -30,7 +30,7 @@ describe('ajustes operacionais via ambiente', () => {
   it.each<[string, string, string]>([
     ['APPOINTMENT_LIST_LIMIT', '1', '500'],
     ['PATIENT_SEARCH_LIMIT', '1', '100'],
-    ['HEALTH_DB_TIMEOUT_MS', '100', '10000'],
+    ['HEALTH_DB_TIMEOUT_MS', '100', '4500'],
   ])('%s aceita os extremos %s e %s', (name, min, max) => {
     expect(parse({ [name]: min }).success).toBe(true);
     expect(parse({ [name]: max }).success).toBe(true);
@@ -46,7 +46,9 @@ describe('ajustes operacionais via ambiente', () => {
     ['PATIENT_SEARCH_LIMIT', '101'],
     ['PATIENT_SEARCH_LIMIT', 'abc'],
     ['HEALTH_DB_TIMEOUT_MS', '99'],
-    ['HEALTH_DB_TIMEOUT_MS', '10001'],
+    ['HEALTH_DB_TIMEOUT_MS', '4501'], // a sonda desiste em 5 s: o 503 do banco não chegaria a tempo
+    ['HEALTH_DB_TIMEOUT_MS', '5000'],
+    ['HEALTH_DB_TIMEOUT_MS', '10000'],
     ['HEALTH_DB_TIMEOUT_MS', '2s'],
   ])('recusa %s=%s (fail-fast na subida)', (name, value) => {
     const result = parse({ [name]: value });
