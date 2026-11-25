@@ -2,14 +2,13 @@
 
 Aplicação web para uma rede de clínicas: a equipe agenda exames e emite laudos; o paciente consulta seus agendamentos e lê os laudos publicados.
 
-Resposta ao desafio técnico *"Agendamento de exames e acesso a laudos"*: frontend em React + TypeScript, backend em Node.js + TypeScript.
 
 | Camada | Tecnologias |
 |---|---|
 | Backend | NestJS 12 · TypeORM 1.1 · PostgreSQL 19 · `@nestjs/authentication` / `@nestjs/authorization` |
 | Frontend | React 19 · Vite 8 · TanStack Router + Query · Mantine 9 (editor de laudo Tiptap) |
 | Infra | Docker Compose · nginx (`clinica.localhost`) · Grafana + Loki · Orthanc (PACS de demonstração) |
-| Testes | Vitest + Supertest contra Postgres real: **97 testes**, unitários e de integração |
+| Testes | Vitest + Supertest contra Postgres real: **184 testes**, unitários e de integração |
 
 **Para avaliar rápido:**
 1. [Suba o ambiente](#2-como-executar). Só precisa de Docker.
@@ -343,18 +342,44 @@ Outros testes do mesmo tipo:
 
 ### 4.11 Auditoria e observabilidade
 
-Em http://grafana.clinica.localhost (`admin` / `admin-demo`), pasta **Clínica**:
+**Acesso ao Grafana**
 
-| Dashboard | O que mostra |
+| | |
 |---|---|
-| **Clínica — Operação** | Agendamentos por dia, exames por tipo, ranking de médicos, cancelamentos, ocupação por dia e horário, tempo até a publicação. Tem filtro por clínica. |
-| **Clínica — Saúde da API** | API, banco e PACS **UP/DOWN**, disponibilidade, latência, erros por rota, acessos negados e logins com falha |
-| **Clínica — Linha do tempo do paciente** | A história de um paciente: agendado, laudo iniciado, publicado, visualizado… |
-| **Clínica — Atividade por usuário** | O que cada usuário fez |
+| URL | http://grafana.clinica.localhost (abre direto no dashboard **Operação**) |
+| Usuário / senha | `admin` / `admin-demo` (`GRAFANA_ADMIN_USER` e `GRAFANA_ADMIN_PASSWORD` do `.env`) |
+| Onde estão os dashboards | Menu **Dashboards** → pasta **Clínica** |
+| Fontes de dados | **Loki** (logs da API e da sonda) e **Clinic DB** (Postgres, papel `grafana_ro`, só leitura) |
 
-Para ver uma queda: rode `docker compose stop backend`, espere uns 30 s e veja **API DOWN** em "Saúde da API". Depois rode `docker compose start backend`. O mesmo vale para `postgres` (banco DOWN) e `orthanc` (PACS DOWN).
+O Grafana sobe junto com o `docker compose up -d`. Não há acesso anônimo nem cadastro de novos usuários.
 
-Sem Grafana, a auditoria também pode ser vista no terminal:
+**Dashboards**
+
+| Dashboard | Link direto | O que mostra | Como usar |
+|---|---|---|---|
+| **Clínica — Operação** | [/d/clinica-operacao](http://grafana.clinica.localhost/d/clinica-operacao) | Agendamentos por dia, exames por tipo, ranking de médicos, cancelamentos, ocupação por dia e horário, tempo até a publicação | Filtro **Clínica** no topo. Período padrão: 30 dias para trás e 30 para frente. |
+| **Clínica — Saúde da API** | [/d/clinica-saude-api](http://grafana.clinica.localhost/d/clinica-saude-api) | API, banco e PACS **UP/DOWN**, disponibilidade, latência, erros por rota, acessos negados e logins com falha | Atualiza sozinho a cada 30 s. Período padrão: últimas 6 h. |
+| **Clínica — Linha do tempo do paciente** | [/d/clinica-paciente](http://grafana.clinica.localhost/d/clinica-paciente) | A história de um paciente: agendado, laudo iniciado, publicado, visualizado… | Cole o **ID do paciente** no campo do topo (veja abaixo como obter). |
+| **Clínica — Atividade por usuário** | [/d/clinica-usuario](http://grafana.clinica.localhost/d/clinica-usuario) | O que cada usuário fez | Cole o **ID do usuário** no campo do topo (veja abaixo como obter). |
+
+Os dois últimos pedem um ID, e não nome ou e-mail, porque os logs só guardam IDs (LGPD). Para obter os IDs:
+
+```bash
+make db-pacientes PACIENTE=joao@mail.com   # coluna patient_id → "Linha do tempo do paciente"
+make db-usuarios                           # coluna user_id    → "Atividade por usuário"
+```
+
+**Ver uma queda:** rode `docker compose stop backend`, espere uns 30 s e veja **API DOWN** em "Saúde da API". Depois rode `docker compose start backend`. O mesmo vale para `postgres` (banco DOWN) e `orthanc` (PACS DOWN).
+
+**Logs crus:** em **Explore**, escolha a fonte **Loki** e consulte, por exemplo:
+
+```logql
+{app="clinic-api"} | json | event="access.denied"
+```
+
+**Alterar um dashboard:** os dashboards são provisionados como arquivo e não podem ser salvos pela interface. Edite o gerador [`docker/grafana/generator/build_dashboards.py`](docker/grafana/generator/build_dashboards.py), rode `python3 docker/grafana/generator/build_dashboards.py` e reinicie o Grafana (`docker compose restart grafana`).
+
+**Sem Grafana**, a auditoria também pode ser vista no terminal:
 ```bash
 make db-historico PACIENTE=joao@mail.com   # trilha de auditoria do paciente
 make db-auditoria LIMITE=20                # eventos mais recentes
@@ -389,15 +414,48 @@ curl -H "Authorization: Bearer $TOKEN" http://clinica.localhost/api/fhir/medical
 
 ## 5. Testes automatizados
 
-Os testes rodam no host, contra o Postgres do compose (`127.0.0.1:5432`). Requerem **Node.js 26** (há `.nvmrc`) e **pnpm 12** (`npm i -g pnpm@12`; o Corepack não acompanha o Node 26).
+Os testes rodam **no host** (fora do Docker), contra o Postgres do compose. **Só o Postgres precisa estar no ar:** o PACS é simulado nos testes e os logs ficam em silêncio, então Orthanc, Loki e Grafana não são necessários.
+
+**Pré-requisitos (uma vez):**
+
+| O quê | Como |
+|---|---|
+| Node.js 26 | Há `.nvmrc` na raiz: `nvm install && nvm use` |
+| pnpm 12 | `npm i -g pnpm@12` (o Corepack não acompanha o Node 26) |
+| Arquivo `.env` na raiz | `cp .env.example .env`. Os testes leem dele a conexão com o banco de testes (`DATABASE_URL_TEST`, `DATABASE_MIGRATION_URL_TEST`) e os segredos. |
+| Dependências | `pnpm install` na raiz (refaça se trocar a versão do Node) |
+
+**Rodar:**
 
 ```bash
-docker compose up -d   # ou só: docker compose up -d postgres
-pnpm install
-pnpm test              # ou: make test
+docker compose up -d postgres   # só o banco (se o ambiente inteiro já estiver no ar, pule)
+make test                       # ou: pnpm test
 ```
 
-Os testes de integração usam o banco `clinic_test`, recriado a partir das migrations reais a cada execução. Eles conectam como `clinic_app`, o mesmo papel do backend.
+**Rodar só uma parte** (dentro de `apps/backend`):
+
+```bash
+cd apps/backend
+pnpm vitest run src                              # só os unitários (rápidos, não usam o banco)
+pnpm vitest run test                             # só os de integração
+pnpm vitest run test/scheduling.e2e-spec.ts      # um arquivo
+pnpm vitest run -t "hoje no topo"                # testes cujo nome contém o texto
+pnpm vitest                                      # modo watch
+pnpm test:cov                                    # com cobertura
+```
+
+**Como funcionam:**
+- Os testes de integração usam o banco `clinic_test`, separado do banco da aplicação. Ele é recriado a partir das migrations reais a cada execução, e os dados de demonstração são recarregados antes dos testes. Os testes conectam como `clinic_app`, o mesmo papel do backend.
+- Os ajustes operacionais (`APPOINTMENT_LIST_LIMIT`, `PATIENT_SEARCH_LIMIT`, `HEALTH_DB_TIMEOUT_MS`) ficam sempre nos valores padrão durante a suíte, mesmo que o seu `.env` ou o shell definam outros. O resultado não depende da máquina.
+
+**Problemas comuns:**
+
+| Sintoma | Causa e solução |
+|---|---|
+| `Defina DATABASE_URL_TEST e DATABASE_MIGRATION_URL_TEST` | Falta o `.env` na raiz: `cp .env.example .env` |
+| `ECONNREFUSED 127.0.0.1:5432` | O Postgres não está no ar: `docker compose up -d postgres`. Se mudou `POSTGRES_PORT` no `.env`, ajuste também as URLs `*_TEST`. |
+| `password authentication failed` | As senhas do `.env` não batem com as do volume do Postgres, que foi criado com outro `.env`. Rode `make reset` para recriar o banco. |
+| Erro de versão do Node ou do pnpm | Confira `node -v` (26) e `pnpm -v` (12) no mesmo terminal em que roda os testes |
 
 **Cenários obrigatórios do enunciado:**
 
