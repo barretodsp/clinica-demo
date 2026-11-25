@@ -26,8 +26,15 @@ function loadDotEnv(): void {
 
 const booleanString = z.enum(['true', 'false']).transform((v) => v === 'true');
 /** Inteiro vindo do ambiente, com default quando a variável não está definida (ou está vazia). */
-const intInRange = (min: number, max: number, fallback: number) =>
-  z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(min).max(max).default(fallback));
+const intInRange = (min: number, max: number, fallback: number, maxMessage?: string) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(min).max(max, maxMessage).default(fallback));
+
+/**
+ * Teto da busca de pacientes (AG-10, LGPD): cada busca de 3 caracteres expõe nomes e CPFs
+ * mascarados, então o env só pode REDUZIR o limite. Subir acima de 20 é uma revisão de
+ * privacidade deliberada: muda-se esta constante (e a AG-10) no código, com revisão.
+ */
+export const PATIENT_SEARCH_LIMIT_MAX = 20;
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -52,8 +59,13 @@ export const envSchema = z.object({
   FHIR_CRM_SYSTEM: z.string().default('https://clinica.localhost/fhir/sid/crm'),
   /** Itens por consulta na lista de agendamentos (não há paginação). */
   APPOINTMENT_LIST_LIMIT: intInRange(1, 500, 50),
-  /** Resultados por busca de paciente (a busca nunca lista todos). */
-  PATIENT_SEARCH_LIMIT: intInRange(1, 100, 20),
+  /** Resultados por busca de paciente (a busca nunca lista todos); só pode reduzir o teto. */
+  PATIENT_SEARCH_LIMIT: intInRange(
+    1,
+    PATIENT_SEARCH_LIMIT_MAX,
+    PATIENT_SEARCH_LIMIT_MAX,
+    `PATIENT_SEARCH_LIMIT acima de ${PATIENT_SEARCH_LIMIT_MAX} exige revisão de privacidade (LGPD, regra AG-10): altere PATIENT_SEARCH_LIMIT_MAX no código.`,
+  ),
   /**
    * Tempo máximo do ping no banco em /api/health/ready. Precisa ficar abaixo do timeout
    * da sonda (docker/uptime, 5 s): acima disso a sonda desiste antes do 503 e registra

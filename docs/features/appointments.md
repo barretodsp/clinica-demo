@@ -25,7 +25,7 @@ A atendente seleciona paciente cadastrado, tipo de exame, data e horário; a equ
 | AG-07 | Feriados nacionais bloqueiam → 422 `HOLIDAY` (ver [calendar-holidays.md](calendar-holidays.md)) | decisão |
 | AG-08 | Agendável até 31/12/2028 → 422 `BEYOND_BOOKING_WINDOW` | decisão |
 | AG-09 | Cancelar só `SCHEDULED` **sem nenhum laudo** (rascunho ou publicado) → 409 `APPOINTMENT_HAS_REPORT` | §4.2 + decisão |
-| AG-10 | Busca de paciente por nome (sem acento/caixa) ou CPF exato; mín. 3 caracteres (422 `SEARCH_TOO_SHORT`); máx. 20 (`PATIENT_SEARCH_LIMIT`); CPF mascarado | decisão |
+| AG-10 | Busca de paciente por nome (sem acento/caixa) ou CPF exato; mín. 3 caracteres (422 `SEARCH_TOO_SHORT`); máx. 20 (`PATIENT_SEARCH_LIMIT` só reduz; acima de 20 exige revisão de privacidade e mudança de `PATIENT_SEARCH_LIMIT_MAX` no código); CPF mascarado | decisão |
 | AG-11 | Filtro por data usa o **dia local** da clínica convertido para intervalo UTC | §4.1 |
 | AG-12 | Agendar/cancelar grava auditoria na mesma transação | decisão |
 

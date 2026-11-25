@@ -21,7 +21,7 @@ export class PatientsController {
 
   /**
    * Busca por nome (parcial, sem acento/caixa) ou CPF (11 dígitos, exato).
-   * Mínimo 3 caracteres, no máximo PATIENT_SEARCH_LIMIT resultados (env, padrão 20), CPF mascarado — nunca lista todos.
+   * Mínimo 3 caracteres, no máximo PATIENT_SEARCH_LIMIT resultados (env, padrão e teto 20 — ver PATIENT_SEARCH_LIMIT_MAX), CPF mascarado — nunca lista todos.
    */
   @Get()
   @Can(RolePolicy, 'staff')
