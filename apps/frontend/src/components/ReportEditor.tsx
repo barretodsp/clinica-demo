@@ -21,7 +21,9 @@ export function ReportEditor({ initialContent, onChange, disabled }: Props) {
   });
 
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    // false: sem emitir "update". O padrão do Tiptap emite, e o onChange marcaria o
+    // rascunho como alterado só por abrir a tela (bloqueando o Publicar sem motivo).
+    editor?.setEditable(!disabled, false);
   }, [editor, disabled]);
 
   return (

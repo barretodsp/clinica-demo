@@ -31,6 +31,7 @@ O médico abre um agendamento, cria o laudo (título, texto e profissional respo
 | LA-13 | Publicação atômica: `UPDATE ... WHERE status = 'DRAFT' AND doctor_id = dono` | decisão |
 | LA-14 | O dono pode descartar o rascunho; o atendimento fica livre (e pode voltar a ser cancelado) | decisão |
 | LA-15 | Criar, salvar, descartar, publicar e visualizar geram auditoria; conteúdo nunca vai para logs | decisão |
+| LA-16 | Na tela, só se publica rascunho **salvo**: com alteração não salva ou salvamento em andamento, o **Publicar** fica bloqueado com a dica do motivo. "Salvo" é controlado pelo número da edição: o salvamento marca como salva só a edição que enviou, e o que for digitado durante o envio continua como não salvo. O publish não salva nada no caminho, então o servidor publica exatamente o que a prévia mostrou. | decisão (revisão) |
 
 ## Máquina de estados
 
@@ -105,7 +106,7 @@ Formato do corpo (exemplo):
 403 (`REPORT_NOT_OWNER`, `REPORT_DRAFT_RESTRICTED`, `REPORT_OTHER_CLINIC`, papel), 404, 409 (`REPORT_IN_PROGRESS`, `REPORT_EXISTS`, `REPORT_PUBLISHED`, `APPOINTMENT_CANCELLED`), 422 (`INVALID_REPORT_BODY`, `EMPTY_REPORT_BODY`, `NO_REGISTRATION_IN_STATE`).
 
 ## Frontend
-Editor Tiptap (`@mantine/tiptap`) com a mesma lista fechada; título com o tipo do exame fixo + complemento; pré-visualização da assinatura (ou aviso de CRM ausente na UF); salvar, descartar (confirmação) e publicar (modal com a **pré-visualização final** e o aviso de que não poderá ser editado); aviso ao sair com alterações não salvas. Publicado: só leitura, igual à visão do paciente.
+Editor Tiptap (`@mantine/tiptap`) com a mesma lista fechada; título com o tipo do exame fixo + complemento; pré-visualização da assinatura (ou aviso de CRM ausente na UF); indicador "Salvo" / "Alterações não salvas"; salvar, descartar (confirmação) e publicar (modal com a **pré-visualização final** e o aviso de que não poderá ser editado), este só com o rascunho salvo (LA-16); aviso ao sair com alterações não salvas. Publicado: só leitura, igual à visão do paciente.
 
 ## Corner cases
 - Cliente envia `title` próprio → ignorado; o título sempre contém o tipo do exame.
@@ -125,6 +126,7 @@ Editor Tiptap (`@mantine/tiptap`) com a mesma lista fechada; título com o tipo 
 | LA-10, LA-11 | `report-body.spec.ts` (lista fechada, JSON real do editor), `report-size.spec.ts` (limite de 100 KB no formato do banco, caractere nulo) e `medical-reports.e2e-spec.ts` › valida o corpo e não publica vazio; › mede o tamanho do corpo como o CHECK do banco; › jsonbTextBytes bate com o Postgres; › caractere nulo → 422 |
 | LA-12 | `medical-reports.e2e-spec.ts` › publicação exige CRM na UF da clínica e grava o registro correto |
 | LA-08 | `medical-reports.e2e-spec.ts` › [obrigatório 4] (`publishedAt`) |
+| LA-16 | Sem teste automatizado (o frontend não tem suíte). Verificado no navegador com latência simulada no salvamento: digitação durante o envio, falha do salvamento, rascunho recém-aberto e publicação. |
 | LA-15 | `fhir.e2e-spec.ts` / `scheduling.e2e-spec.ts` (auditoria); `misc.spec.ts` (redação) |
 
 ## Limitações e evoluções

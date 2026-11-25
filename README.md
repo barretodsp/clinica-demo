@@ -274,6 +274,7 @@ Cada cenário indica a conta, os passos e o resultado esperado. Dica: para compa
 **Variações:**
 - **Descartar rascunho:** apaga o rascunho e libera o atendimento.
 - **Publicar com texto vazio:** é recusado.
+- **Publicar com alteração não salva:** o botão **Publicar…** fica bloqueado, com a dica "Salve o rascunho antes de publicar.". Só se publica o que já está salvo, e a prévia mostra exatamente o que será publicado.
 
 ### 4.6 Rascunho restrito e um laudo por agendamento
 
@@ -516,7 +517,8 @@ Detalhes e justificativas em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - **Feriados:** só os nacionais, numa lista fixa de 2026 a 2028. Agendamentos vão até 31/12/2028.
 - **Sessão sem estado:** o logout apaga o cookie, mas um token já emitido vale até expirar (1 h).
 - **O 403 revela que o recurso existe:** foi uma decisão pedida, atenuada pelos IDs UUID v7 não sequenciais.
-- **Rascunho sem controle de versão:** com duas abas do mesmo médico, vale a última gravação. Se um médico for desvinculado com rascunho aberto, o atendimento fica preso, porque não há tela de administração.
+- **Rascunho sem controle de versão no servidor:** com o mesmo rascunho aberto em duas abas do mesmo médico (cenário improvável, como uma aba esquecida aberta), vale a última gravação, e a prévia da aba antiga pode mostrar uma versão anterior à publicada. O conteúdo publicado é sempre o último salvamento do próprio médico, já que só o dono edita e publica. Em uma única aba, a tela só libera a publicação com o rascunho salvo (LA-16).
+- **Rascunho preso:** se um médico for desvinculado com rascunho aberto, o atendimento fica preso, porque não há tela de administração.
 - **Cadastros** de clínicas, usuários e vínculos só pelo seed.
 - **Isolamento entre clínicas** feito na aplicação. O Row Level Security do Postgres seria uma segunda camada.
 - **O Grafana lê as tabelas operacionais**, que incluem dados pessoais. O ideal seria uma base analítica separada.

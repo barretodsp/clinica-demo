@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Card, Grid, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Button, Card, Grid, Group, Loader, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconArrowLeft, IconDeviceFloppy, IconFileCheck, IconTrash } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
@@ -142,39 +142,63 @@ function ReportLoader({ clinicId, reportId, onChange }: { clinicId: string; repo
   return <DraftEditor key={data.id} clinicId={clinicId} report={data} onChange={onChange} />;
 }
 
+/** Retrato do rascunho no momento do salvamento: o conteúdo e o número da edição. */
+interface DraftSnapshot {
+  version: number;
+  complement: string;
+  body: ReportDocument;
+}
+
 function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report: MedicalReport; onChange: () => Promise<void> }) {
   const queryClient = useQueryClient();
   const [complement, setComplement] = useState(report.titleComplement ?? '');
   const [body, setBody] = useState<ReportDocument>(report.body);
-  const [dirty, setDirty] = useState(false);
+  /**
+   * Controle de "salvo" por número de edição (interno, nunca exibido):
+   * - `version` sobe a cada alteração no texto ou no complemento;
+   * - `savedVersion` é a última edição que o servidor confirmou.
+   * O salvamento leva o número da edição que enviou e só ela é marcada como salva:
+   * o que for digitado enquanto a requisição está no ar continua como não salvo.
+   */
+  const [version, setVersion] = useState(0);
+  const [savedVersion, setSavedVersion] = useState(0);
+  const dirty = version !== savedVersion;
+  const edited = () => setVersion((v) => v + 1);
+  // depois de publicar ou descartar, sair da tela não pede confirmação
+  const [closed, setClosed] = useState(false);
   const base = `/clinics/${clinicId}/medical-reports/${report.id}`;
   const title = complement.trim() ? `${report.examType.name} — ${complement.trim()}` : report.examType.name;
+  // salvar e publicar rodam em fila: nunca duas requisições do mesmo laudo em paralelo
+  const scope = { id: `medical-report:${report.id}` };
 
   // aviso ao sair com alterações não salvas
   useBlocker({
-    shouldBlockFn: () => dirty && !window.confirm('Há alterações não salvas no laudo. Sair mesmo assim?'),
-    enableBeforeUnload: () => dirty,
+    shouldBlockFn: () => dirty && !closed && !window.confirm('Há alterações não salvas no laudo. Sair mesmo assim?'),
+    enableBeforeUnload: () => dirty && !closed,
   });
 
   // onChange invalida tudo da clínica (inclui o laudo): uma única recarga
   const reload = () => onChange();
 
   const save = useMutation({
-    mutationFn: () => api<MedicalReport>(base, { method: 'PUT', json: { titleComplement: complement || null, body } }),
-    onSuccess: (saved) => {
-      setDirty(false);
+    scope,
+    mutationFn: (snapshot: DraftSnapshot) =>
+      api<MedicalReport>(base, { method: 'PUT', json: { titleComplement: snapshot.complement || null, body: snapshot.body } }),
+    onSuccess: (saved, snapshot) => {
+      // marca como salva só a edição enviada (nunca volta para trás)
+      setSavedVersion((v) => Math.max(v, snapshot.version));
       queryClient.setQueryData(['clinics', clinicId, 'report', report.id], saved);
     },
-    onError: notifyError,
+    onError: (e) => notifyError(e),
   });
 
+  // só publica rascunho salvo (o botão fica bloqueado antes disso): o servidor publica
+  // exatamente o que está na tela e na prévia, sem salvar nada no caminho
   const publish = useMutation({
-    mutationFn: async () => {
-      if (dirty) await save.mutateAsync();
-      return api<MedicalReport>(`${base}/publish`, { method: 'POST' });
-    },
+    scope,
+    mutationFn: () => api<MedicalReport>(`${base}/publish`, { method: 'POST' }),
     onSuccess: async () => {
-      setDirty(false);
+      setClosed(true);
       notifySuccess('Laudo publicado. Ele já está disponível para o paciente.');
       await reload();
     },
@@ -184,7 +208,7 @@ function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report:
   const discard = useMutation({
     mutationFn: () => api<void>(base, { method: 'DELETE' }),
     onSuccess: async () => {
-      setDirty(false);
+      setClosed(true);
       notifySuccess('Rascunho descartado. O atendimento está livre para outro médico.');
       queryClient.removeQueries({ queryKey: ['clinics', clinicId, 'report', report.id] });
       await onChange();
@@ -193,6 +217,7 @@ function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report:
   });
 
   const preview = report.signaturePreview;
+  const unsavedReason = save.isPending ? 'Aguarde o salvamento terminar.' : dirty ? 'Salve o rascunho antes de publicar.' : null;
 
   function confirmPublish() {
     modals.openConfirmModal({
@@ -227,7 +252,7 @@ function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report:
             value={complement}
             onChange={(e) => {
               setComplement(e.currentTarget.value);
-              setDirty(true);
+              edited();
             }}
           />
         </Group>
@@ -235,7 +260,7 @@ function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report:
           initialContent={report.body}
           onChange={(doc) => {
             setBody(doc);
-            setDirty(true);
+            edited();
           }}
         />
         {preview && (
@@ -267,12 +292,31 @@ function DraftEditor({ clinicId, report, onChange }: { clinicId: string; report:
             Descartar rascunho
           </Button>
           <Group>
-            <Button variant="default" leftSection={<IconDeviceFloppy size={16} />} loading={save.isPending} disabled={!dirty} onClick={() => save.mutate()}>
+            <Button
+              variant="default"
+              leftSection={<IconDeviceFloppy size={16} />}
+              loading={save.isPending}
+              disabled={!dirty}
+              onClick={() => save.mutate({ version, complement, body })}
+            >
               Salvar rascunho
             </Button>
-            <Button leftSection={<IconFileCheck size={16} />} loading={publish.isPending} disabled={preview ? !preview.canPublish : false} onClick={confirmPublish}>
-              Publicar…
-            </Button>
+            {/* data-disabled (e não disabled) para o Tooltip funcionar no botão bloqueado */}
+            <Tooltip label={unsavedReason} disabled={!unsavedReason}>
+              <Button
+                leftSection={<IconFileCheck size={16} />}
+                loading={publish.isPending}
+                disabled={preview ? !preview.canPublish : false}
+                data-disabled={unsavedReason ? true : undefined}
+                aria-disabled={unsavedReason ? true : undefined}
+                onClick={(e) => {
+                  if (unsavedReason) return e.preventDefault();
+                  confirmPublish();
+                }}
+              >
+                Publicar…
+              </Button>
+            </Tooltip>
           </Group>
         </Group>
       </Stack>
